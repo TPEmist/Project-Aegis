@@ -1,0 +1,1 @@
+I will write the `CONTRIBUTING.md` file with instructions for code contribution and a call to action for the `CoinbaseWalletProvider` and `Privacy
