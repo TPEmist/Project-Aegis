@@ -15,6 +15,7 @@ max_per_tx = float(os.getenv("AEGIS_MAX_PER_TX", "100.0"))
 max_daily = float(os.getenv("AEGIS_MAX_DAILY", "500.0"))
 block_loops = os.getenv("AEGIS_BLOCK_LOOPS", "true").lower() == "true"
 stripe_key = os.getenv("AEGIS_STRIPE_KEY")
+unmask_cards = os.getenv("AEGIS_UNMASK_CARDS", "false").lower() == "true"
 
 policy = GuardrailPolicy(
     allowed_categories=allowed_categories,
@@ -43,8 +44,11 @@ async def request_virtual_card(requested_amount: float, target_vendor: str, reas
     if seal.status.lower() == "rejected":
         return f"Payment rejected by guardrails. Reason: {seal.rejection_reason}"
     
-    masked_card = f"****-****-****-{seal.card_number[-4:]}"
-    return f"Payment approved. Card Issued: {masked_card}, Expiry: {seal.expiration_date}, Amount: {seal.authorized_amount}"
+    if unmask_cards:
+        return f"Payment approved. Card Issued: {seal.card_number}, CVV: {seal.cvv}, Expiry: {seal.expiration_date}, Amount: {seal.authorized_amount}"
+    else:
+        masked_card = f"****-****-****-{seal.card_number[-4:]}"
+        return f"Payment approved. Card Issued: {masked_card}, Expiry: {seal.expiration_date}, Amount: {seal.authorized_amount}"
 
 if __name__ == "__main__":
     mcp.run()

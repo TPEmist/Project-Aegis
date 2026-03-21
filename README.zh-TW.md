@@ -108,6 +108,7 @@ export AEGIS_MAX_PER_TX=100.0        # 單筆交易上限 $100
 export AEGIS_MAX_DAILY=500.0         # 每日總預算上限 $500
 export AEGIS_BLOCK_LOOPS=true        # 阻擋幻覺 / 重試迴圈
 # 可選：export AEGIS_STRIPE_KEY=sk_live_...（Stripe 設定請見 §8）
+# 可選：export AEGIS_UNMASK_CARDS=true      # 向 Agent 顯示完整卡號與 CVV（用於測試）
 ```
 
 ### 步驟四：開始使用

@@ -108,6 +108,7 @@ export AEGIS_MAX_PER_TX=100.0        # Max $100 per single transaction
 export AEGIS_MAX_DAILY=500.0         # Max $500 per day total
 export AEGIS_BLOCK_LOOPS=true        # Block hallucination/retry loops
 # Optional: export AEGIS_STRIPE_KEY=sk_live_... (see §8 for Stripe setup)
+# Optional: export AEGIS_UNMASK_CARDS=true      # Reveal full PAN/CVV to agent (for testing)
 ```
 
 ### Step 4: Use It
