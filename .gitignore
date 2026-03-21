@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Project specific
+*.db
+aegis_state.db
+MEMORY.md
+skills/
+run_parallel.sh
+dist/
+build/

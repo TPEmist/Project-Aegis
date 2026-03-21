@@ -1,35 +1,85 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import sqlite3
+from datetime import date
+import os
 
+# Set page config
 st.set_page_config(page_title="The Vault - Aegis Dashboard", layout="wide")
 
 st.title("🛡️ The Vault - AgentPay Dashboard")
 
+# Database path - located in project root
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "aegis_state.db"))
+
+# Sidebar
 st.sidebar.header("Vault Settings")
-max_amount = st.sidebar.slider("Max Amount Per Tx ($)", 10, 500, 50)
-allowed_categories = st.sidebar.multiselect("Allowed Vendors", ["AWS", "Cloudflare", "OpenAI", "Anthropic", "GitHub"], default=["AWS", "Cloudflare"])
-block_hallucination = st.sidebar.checkbox("Block Hallucination Loops", value=True)
+max_daily_budget = st.sidebar.slider("Max Daily Budget ($)", 10, 2000, 500)
 
-st.write("### Semantic Engine Logs & Activity")
+if st.sidebar.button("Refresh Data"):
+    st.rerun()
 
-col1, col2 = st.columns(2)
+# Helper function to get data
+def load_data():
+    if not os.path.exists(DB_PATH):
+        # Return empty structures if DB doesn't exist
+        return pd.DataFrame(columns=["seal_id", "amount", "vendor", "status", "timestamp"]), 0.0
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            # Main Screen: Load all issued seals
+            issued_df = pd.read_sql_query("SELECT * FROM issued_seals ORDER BY timestamp DESC", conn)
+        except (pd.errors.DatabaseError, sqlite3.OperationalError):
+            # Table doesn't exist yet
+            issued_df = pd.DataFrame(columns=["seal_id", "amount", "vendor", "status", "timestamp"])
+            
+        try:
+            # Budget Tracking: Query daily_budget for today's spent_amount
+            today = date.today().isoformat()
+            budget_query = "SELECT spent_amount FROM daily_budget WHERE date = ?"
+            budget_df = pd.read_sql_query(budget_query, conn, params=(today,))
+            spent_today = budget_df['spent_amount'].iloc[0] if not budget_df.empty else 0.0
+        except (pd.errors.DatabaseError, sqlite3.OperationalError):
+            spent_today = 0.0
+            
+    return issued_df, spent_today
 
-with col1:
-    st.subheader("💳 Issued Seals (VCC)")
-    issued_data = pd.DataFrame([
-        {"Time": "2026-03-20 14:00", "Agent": "Claude-Code", "Vendor": "Cloudflare", "Amount": 15.0, "CVV": "***"},
-        {"Time": "2026-03-20 15:30", "Agent": "OpenHands", "Vendor": "AWS", "Amount": 45.0, "CVV": "***"}
-    ])
-    st.dataframe(issued_data, use_container_width=True)
+# Load data
+issued_df, spent_today = load_data()
 
-with col2:
-    st.subheader("🚫 Rejected Attempts (Intercepted)")
-    rejected_data = pd.DataFrame([
-        {"Time": "2026-03-20 10:15", "Agent": "AutoGPT", "Vendor": "AWS", "Amount": 1500.0, "Reason": "Exceeds max transaction limit"},
-        {"Time": "2026-03-20 16:10", "Agent": "Claude-Code", "Vendor": "Unknown", "Amount": 10.0, "Reason": "Hallucination / infinite loop detected"}
-    ])
-    st.dataframe(rejected_data, use_container_width=True)
+# Budget Tracking Section
+remaining_budget = max(0.0, max_daily_budget - spent_today)
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Today's Spending", f"${spent_today:,.2f}")
+col2.metric("Remaining Budget", f"${remaining_budget:,.2f}")
+col3.metric("Max Daily Budget", f"${max_daily_budget:,.2f}")
+
+# Progress bar: spending relative to the slider's max budget
+progress_val = min(1.0, spent_today / max_daily_budget) if max_daily_budget > 0 else 0
+st.write(f"**Budget Utilization ({progress_val*100:.1f}%)**")
+st.progress(progress_val)
 
 st.write("---")
-st.markdown("*Aegis Project MVP Dashboard - Mock Data Stream*")
+
+# Main Screen: Issued Seals
+st.subheader("💳 Issued Seals & Activity")
+if not issued_df.empty:
+    st.dataframe(issued_df, use_container_width=True)
+else:
+    st.info("No records found in 'issued_seals' table.")
+
+# Rejected Summary (Optional)
+st.write("---")
+st.subheader("🚫 Rejected Summary")
+if not issued_df.empty and 'status' in issued_df.columns:
+    rejected_df = issued_df[issued_df['status'].str.lower() == 'rejected']
+    if not rejected_df.empty:
+        st.dataframe(rejected_df, use_container_width=True)
+    else:
+        st.success("No rejected attempts found.")
+else:
+    st.info("No data available to show rejected attempts.")
+
+st.write("---")
+st.markdown("*Aegis Project MVP Dashboard - Live Database Stream*")

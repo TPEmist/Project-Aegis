@@ -11,7 +11,7 @@ class AegisPaymentInput(BaseModel):
 
 class AegisPaymentTool(BaseTool):
     name: str = "aegis_payment_tool"
-    description: str = "當你需要突破付費牆、購買 API 配額或支付任何線上服務時使用。請提供完整的購買理由與目標供應商。"
+    description: str = "Use this tool when you need to bypass a paywall, purchase API credits, or pay for any online service. Provide the amount, target vendor, and your full reasoning."
     args_schema: Type[BaseModel] = AegisPaymentInput
     
     client: Any = Field(description="The AegisClient instance")
@@ -21,7 +21,7 @@ class AegisPaymentTool(BaseTool):
         super().__init__(client=client, agent_id=agent_id, **kwargs)
 
     def _run(self, requested_amount: float, target_vendor: str, reasoning: str, run_manager=None) -> str:
-        raise NotImplementedError("Use the async method _arun instead.")
+        return "Please use the async method ainvoke() for AegisPaymentTool."
 
     async def _arun(self, requested_amount: float, target_vendor: str, reasoning: str, run_manager=None) -> str:
         intent = PaymentIntent(
@@ -36,4 +36,5 @@ class AegisPaymentTool(BaseTool):
         if seal.status.lower() == "rejected":
             return f"Payment rejected by guardrails. Reason: {seal.rejection_reason}"
         else:
-            return f"Payment approved. Card Issued: {seal.card_number}, CVV: {seal.cvv}, Expiry: {seal.expiration_date}, Authorized Amount: {seal.authorized_amount}"
+            masked_card = f"****-****-****-{seal.card_number[-4:]}"
+            return f"Payment approved. Card Issued: {masked_card}, Expiry: {seal.expiration_date}, Authorized Amount: {seal.authorized_amount}"

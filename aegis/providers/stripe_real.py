@@ -8,32 +8,64 @@ class StripeIssuingProvider(VirtualCardProvider):
         stripe.api_key = api_key
 
     async def issue_card(self, intent: PaymentIntent, policy: GuardrailPolicy) -> VirtualSeal:
-        if intent.requested_amount > policy.max_amount_per_tx:
+        try:
+            if intent.requested_amount > policy.max_amount_per_tx:
+                return VirtualSeal(
+                    seal_id=str(uuid.uuid4()),
+                    authorized_amount=0.0,
+                    status="Rejected",
+                    rejection_reason="Amount exceeds policy limit"
+                )
+
+            # Create a Cardholder first as required
+            cardholder = stripe.issuing.Cardholder.create(
+                type='individual',
+                name='Aegis Agent',
+                billing={
+                    'address': {
+                        'line1': '123 AI St',
+                        'city': 'San Francisco',
+                        'state': 'CA',
+                        'postal_code': '94105',
+                        'country': 'US'
+                    }
+                }
+            )
+
+            # Create the virtual card using the cardholder.id
+            card = stripe.issuing.Card.create(
+                cardholder=cardholder.id,
+                type='virtual',
+                currency='usd',
+                spending_controls={
+                    'spending_limits': [
+                        {
+                            'amount': int(intent.requested_amount * 100),
+                            'interval': 'all_time'
+                        }
+                    ]
+                }
+            )
+            
+            return VirtualSeal(
+                seal_id=str(uuid.uuid4()),
+                card_number=f"****{card.last4}",
+                cvv="***",
+                expiration_date=f"{card.exp_month}/{card.exp_year}",
+                authorized_amount=intent.requested_amount,
+                status="Issued"
+            )
+        except stripe.StripeError as e:
             return VirtualSeal(
                 seal_id=str(uuid.uuid4()),
                 authorized_amount=0.0,
                 status="Rejected",
-                rejection_reason="Amount exceeds policy limit"
+                rejection_reason=str(e)
             )
-
-        card = stripe.issuing.Card.create(
-            type='virtual',
-            currency='usd',
-            spending_controls={
-                'spending_limits': [
-                    {
-                        'amount': int(intent.requested_amount * 100),
-                        'interval': 'all_time'
-                    }
-                ]
-            }
-        )
-        
-        return VirtualSeal(
-            seal_id=str(uuid.uuid4()),
-            card_number=f"****{card.last4}",
-            cvv="***",
-            expiration_date=f"{card.exp_month}/{card.exp_year}",
-            authorized_amount=intent.requested_amount,
-            status="Issued"
-        )
+        except Exception as e:
+            return VirtualSeal(
+                seal_id=str(uuid.uuid4()),
+                authorized_amount=0.0,
+                status="Rejected",
+                rejection_reason=str(e)
+            )
