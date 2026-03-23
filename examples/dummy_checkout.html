@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stripe Demo Mock</title>
+</head>
+<body>
+    <h1>Checkout Page</h1>
+    <p>Please enter your payment details below.</p>
+    <!-- Simulating a third-party payment iframe -->
+    <iframe id="payment-frame" srcdoc="
+        <!DOCTYPE html>
+        <html>
+        <body style='font-family: sans-serif;'>
+            <h3>Secured by Stripe (Mock)</h3>
+            <label>Card Number:</label>
+            <input type='text' autocomplete='cc-number' name='cardnumber' placeholder='Card number'>
+            <br><br>
+            <label>Expiry:</label>
+            <input type='text' autocomplete='cc-exp' name='exp-date' placeholder='MM/YY'>
+            <br><br>
+            <label>CVV:</label>
+            <input type='text' autocomplete='cc-csc' name='cvc' placeholder='CVC'>
+        </body>
+        </html>
+    " width="400" height="250" style="border: 1px solid #ccc; border-radius: 8px;"></iframe>
+</body>
+</html>
