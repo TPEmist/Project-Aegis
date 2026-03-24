@@ -21,3 +21,4 @@ build/
 *_proof.png
 README.pypi.md
 .pytest_cache/
+local_tests/

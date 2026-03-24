@@ -6,7 +6,7 @@
     </picture>
 </p>
 
-# Project Aegis (AgentPay)
+# Project Aegis - AgentPay
 
 Project Aegis 是專為 Agentic AI（如 OpenClaw、NemoClaw、Claude Code、OpenHands）設計的**支付護欄與一次性交易協議**。它能讓 AI Agent 安全地處理金融交易，同時避免人類信用卡被無限制地暴露於風險之中。
 
