@@ -35,11 +35,14 @@ You must return only JSON: {{"approved": bool, "reason": str}}
         if self.use_json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
-        response = await self.client.chat.completions.create(**kwargs)
-        
-        result_text = response.choices[0].message.content
         try:
+            response = await self.client.chat.completions.create(**kwargs)
+            result_text = response.choices[0].message.content
+            
             result = json.loads(result_text)
             return result.get("approved", False), result.get("reason", "Unknown")
+        except openai.OpenAIError as e:
+            # Handle API authentication/connection errors without crashing the main loop
+            return False, f"LLM Guardrail API Error: {str(e)}"
         except (json.JSONDecodeError, KeyError, Exception) as e:
-            return False, f"LLM Engine Error: {str(e)}"
+            return False, f"LLM Engine Parse Error: {str(e)}"
