@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Developer Tools**: Added `AEGIS_UNMASK_CARDS` environment variable to optionally disable card masking (e.g., `****` default) during local testing and E2E validation.
 
+## [0.3.4] - 2026-03-25
+### Fixed
+- **BYOC Provider Wiring**: `LocalVaultProvider` was not wired into `mcp_server.py`. Real card credentials set via `AEGIS_BYOC_NUMBER` were silently ignored and fell through to `MockStripeProvider`. Added a dedicated BYOC branch to the provider selection logic. Provider priority (high → low): Stripe Issuing → BYOC Local → Mock.
+
+### Added
+- **`.env.example`**: Added a full environment variable reference file to the repo root, including all `AEGIS_*` policy variables and the new `AEGIS_BILLING_*` fields.
+- **Claude Code Full Setup Guide**: Documented the complete three-component setup for Claude Code (Hacker Edition / BYOC): Chrome CDP launch (`--remote-debugging-port=9222`), Aegis MCP registration with `--project` flag, and Playwright MCP registration with `--cdp-endpoint`. Both MCPs share the same Chrome instance so users can watch the full injection flow live.
+
 ## [0.3.3] - 2026-03-23
 ### Added
 - **Browser Automation Layer (`AegisBrowserInjector`)**: Implemented CDP-based cross-origin iframe traversal logic to securely auto-fill real cards for Playwright or browser-use workflows, hiding raw PAN from the agent's context.

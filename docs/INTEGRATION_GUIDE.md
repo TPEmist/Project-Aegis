@@ -208,11 +208,12 @@ Browser agents that navigate real websites need to intercept the checkout flow a
 ┌──────────────────────────────────────────────────────┐
 │              Browser Agent Layer (resumed)            │
 │                                                       │
-│  4. Trusted local process retrieves real card details │
-│     (via state_tracker.get_seal_details — NOT the LLM)│
-│  5. page.fill("#card_number", real_pan)               │
-│  6. page.fill("#cvv", real_cvv)                       │
-│  7. page.click("#submit")                             │
+│  4. AegisBrowserInjector attaches to Chrome via CDP  │
+│     (--remote-debugging-port=9222)                   │
+│  5. Traverses cross-origin iframes (e.g. Stripe Elm.) │
+│  6. Injects real card into DOM — NOT via page.fill()  │
+│     (raw PAN handled only by trusted local process)   │
+│  7. Agent clicks submit (only sees masked card number)│
 │  8. execute_payment(seal_id) → card burned            │
 └──────────────────────────────────────────────────────┘
 ```
@@ -305,6 +306,115 @@ class AegisCheckoutInterceptor:
         """Called after browser-use successfully submits the form."""
         await self.client.execute_payment(seal_id, amount)
 ```
+
+---
+
+## 4. Claude Code — Full Setup with CDP Injection
+
+This section covers the complete three-component setup for using Aegis with **Claude Code** (Hacker Edition / BYOC). Both MCPs share the same Chrome instance: Playwright MCP handles navigation while Aegis MCP injects card credentials directly into the DOM via CDP. The user can watch the entire flow live in the browser — the raw card number never enters Claude's context.
+
+### Architecture
+
+```
+Chrome (--remote-debugging-port=9222)
+├── Playwright MCP  ──→ agent uses for navigation
+└── Aegis MCP       ──→ injects real card via CDP
+         │
+         └── Claude Code Agent (only sees ****-****-****-4242)
+```
+
+### Step 0 — Launch Chrome with CDP (must be done first, every session)
+
+```bash
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-aegis-profile
+
+# Linux
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile
+```
+
+> **Why `--user-data-dir`?** If Chrome is already running, a separate profile is required to open a new instance with CDP enabled. Without this flag, Chrome silently reuses the existing instance and CDP will not be available.
+
+Verify that CDP is active:
+
+```bash
+curl http://localhost:9222/json/version
+# Should return a JSON object with "Browser", "webSocketDebuggerUrl", etc.
+```
+
+**Recommended shell alias** (add to `~/.zshrc` or `~/.bashrc`):
+
+```bash
+# macOS
+alias chrome-cdp='"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+
+# Linux
+alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+```
+
+### Step 1 — Configure `.env`
+
+Copy the provided example and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+
+```bash
+AEGIS_BYOC_NUMBER=4111111111111111   # Your real card number
+AEGIS_BYOC_CVV=123
+AEGIS_BYOC_EXPIRY=12/27
+AEGIS_BYOC_NAME=Your Name
+
+# Policy settings
+AEGIS_ALLOWED_CATEGORIES=["aws", "cloudflare", "openai"]
+AEGIS_MAX_PER_TX=100.0
+AEGIS_MAX_DAILY=500.0
+AEGIS_BLOCK_LOOPS=true
+```
+
+### Step 2 — Add Aegis MCP to Claude Code
+
+```bash
+claude mcp add aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+```
+
+> The `--project` flag tells `uv` which project directory to use, so the `.env` file and `aegis_state.db` are resolved relative to the correct location.
+
+### Step 3 — Add Playwright MCP to Claude Code
+
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+```
+
+> This connects Playwright MCP to the **same Chrome instance** you launched in Step 0. Both MCPs now share one browser window.
+
+### Recommended System Prompt Addition
+
+Add the following block to your Claude Code system prompt (or project `CLAUDE.md`):
+
+```
+Payment rules:
+- Only call request_virtual_card when you can see credit card input fields on the current page
+- After approval, the system auto-fills the card — just click submit
+- Never manually type any card number or CVV
+- If request_virtual_card is rejected, do not retry — report to user
+```
+
+### Full Session Checklist
+
+1. `chrome-cdp` — launch Chrome with CDP
+2. `curl http://localhost:9222/json/version` — verify CDP is up
+3. Start Claude Code — both MCPs connect automatically
+4. Give your agent a task involving a checkout page
+5. Agent navigates via Playwright MCP, calls `request_virtual_card` via Aegis MCP
+6. `AegisBrowserInjector` injects real card via CDP — agent only sees the masked number
+7. Agent clicks submit; card is burned after use
 
 ---
 

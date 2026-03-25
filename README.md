@@ -75,6 +75,7 @@ The real power emerges when Aegis is paired with a browser automation agent (e.g
 | **OpenHands** | MCP Tool Call | [Quick Start §5](#5-quick-start-for-openclaw--nemoclaw--claude-code--openhands) |
 | **OpenClaw + browser-use** | MCP Tool Call | [Quick Start §5](#5-quick-start-for-openclaw--nemoclaw--claude-code--openhands) |
 | **NemoClaw (sandboxed)** | MCP Tool Call inside sandbox | [Quick Start §5](#5-quick-start-for-openclaw--nemoclaw--claude-code--openhands) |
+| **Claude Code + Playwright MCP** | Aegis MCP + CDP injection | [Integration Guide §4](./docs/INTEGRATION_GUIDE.md#4-claude-code--full-setup-with-cdp-injection) |
 | **Custom Playwright / Selenium** | Python SDK `AegisClient` | [Integration Guide](./docs/INTEGRATION_GUIDE.md) |
 | **Skyvern / browser-use** | Python SDK middleware | [Integration Guide](./docs/INTEGRATION_GUIDE.md) |
 
@@ -157,10 +158,58 @@ openclaw mcp add aegis -- uv run python -m aegis.mcp_server
 
 > **Note:** NemoClaw restricts file access. Make sure Project-Aegis is cloned inside `/sandbox/` so the agent can access it. The `aegis_state.db` will be created in the sandbox's writable directory.
 
-**Claude Code:**
+**Claude Code (Hacker Edition / BYOC — Full Setup):**
+
+Claude Code requires three components to enable live CDP card injection. Playwright MCP navigates websites while Aegis injects real card credentials into the same browser window — the card number never enters AI context.
+
+**Step 0 — Launch Chrome with CDP (required every session, must be done first):**
 ```bash
-claude mcp add aegis -- uv run python -m aegis.mcp_server
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-aegis-profile
+
+# Linux
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile
 ```
+> `--user-data-dir` is required if Chrome is already running — it opens a separate instance with CDP enabled.
+> Verify: `curl http://localhost:9222/json/version`
+
+**Step 1 — Configure `.env` (copy from `.env.example`):**
+```bash
+cp .env.example .env
+# Edit .env: set AEGIS_BYOC_NUMBER, AEGIS_BYOC_CVV, AEGIS_BYOC_EXPIRY, etc.
+```
+
+**Step 2 — Add Aegis MCP to Claude Code:**
+```bash
+claude mcp add aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+```
+
+**Step 3 — Add Playwright MCP (connected to the same Chrome via CDP):**
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+```
+
+**Architecture:**
+```
+Chrome (--remote-debugging-port=9222)
+├── Playwright MCP  ──→ agent uses for navigation
+└── Aegis MCP       ──→ injects real card via CDP
+         │
+         └── Claude Code Agent (only sees ****-****-****-4242)
+```
+
+**Recommended System Prompt addition:**
+```
+Payment rules:
+- Only call request_virtual_card when you can see credit card input fields on the current page
+- After approval, the system auto-fills the card — just click submit
+- Never manually type any card number or CVV
+- If request_virtual_card is rejected, do not retry — report to user
+```
+
+> See **[docs/INTEGRATION_GUIDE.md §4](./docs/INTEGRATION_GUIDE.md#4-claude-code--full-setup-with-cdp-injection)** for the full step-by-step guide including shell aliases.
 
 **OpenHands:** Add to your MCP configuration:
 ```json
@@ -335,6 +384,35 @@ client = AegisClient(
     policy=policy
 )
 ```
+
+### BYOC — Bring Your Own Card (Hacker Edition)
+
+For developers who want to use their **own physical credit card** with Aegis without a Stripe account. The `LocalVaultProvider` reads card credentials from environment variables and injects them into browser payment forms via CDP — the raw PAN is never exposed to the agent.
+
+**Set the following environment variables (or copy `.env.example`):**
+```bash
+export AEGIS_BYOC_NUMBER="4111111111111111"   # Your real card number
+export AEGIS_BYOC_CVV="123"
+export AEGIS_BYOC_EXPIRY="12/27"
+export AEGIS_BYOC_NAME="Your Name"            # Optional: cardholder name
+# The MCP server will automatically use LocalVaultProvider
+uv run python -m aegis.mcp_server
+```
+
+**Provider priority (high → low):** Stripe Issuing → BYOC Local → Mock.
+
+If `AEGIS_STRIPE_KEY` is set, Stripe takes precedence. If `AEGIS_BYOC_NUMBER` is set (but no Stripe key), `LocalVaultProvider` is used. If neither is set, `MockStripeProvider` is used for development.
+
+```python
+from aegis.providers.byoc_local import LocalVaultProvider
+
+client = AegisClient(
+    provider=LocalVaultProvider(),  # reads from env vars automatically
+    policy=policy
+)
+```
+
+> **Security note:** Never commit real card numbers to version control. Always use `.env` (which is `.gitignore`d) or a secrets manager. The CDP injection ensures the full card number is only handled by the local trusted process, never by the LLM.
 
 ### With Real Stripe Issuing
 

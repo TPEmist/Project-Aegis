@@ -3,7 +3,7 @@
 # Aegis 整合指南
 
 > **給 Agent 開發者**，想要將 Aegis 作為財務中間層嵌入 Agentic 工作流程的實戰參考。  
-> 本指南涵蓋三種整合模式：**OpenClaw/NemoClaw System Prompt**、**直接 Python SDK / gemini-cli**，以及**瀏覽器 Agent 中間層（Playwright / browser-use / Skyvern）**。
+> 本指南涵蓋四種整合模式：**OpenClaw/NemoClaw System Prompt**、**直接 Python SDK / gemini-cli**、**瀏覽器 Agent 中間層（Playwright / browser-use / Skyvern）**，以及 **Claude Code 完整 CDP 注入設定**。
 
 ---
 
@@ -208,11 +208,12 @@ print(result)
 ┌──────────────────────────────────────────────────────┐
 │              瀏覽器 Agent 層（繼續）                   │
 │                                                       │
-│  4. 可信任的本地程式從 DB 取得真實卡片資訊              │
-│     (透過 state_tracker.get_seal_details — 非 LLM)    │
-│  5. page.fill("#card_number", real_pan)               │
-│  6. page.fill("#cvv", real_cvv)                       │
-│  7. page.click("#submit")                             │
+│  4. AegisBrowserInjector 透過 CDP 連線至 Chrome       │
+│     (--remote-debugging-port=9222)                   │
+│  5. 穿透跨網域 Iframe（如 Stripe Elements）            │
+│  6. 將真實卡片注入 DOM — 非透過 page.fill()            │
+│     （原始卡號僅由可信任的本地程序處理）                 │
+│  7. Agent 點擊送出（只看到遮罩後的卡號）                 │
 │  8. execute_payment(seal_id) → 虛擬卡銷毀              │
 └──────────────────────────────────────────────────────┘
 ```
@@ -305,6 +306,115 @@ class AegisCheckoutInterceptor:
         """browser-use 成功送出表單後呼叫。"""
         await self.client.execute_payment(seal_id, amount)
 ```
+
+---
+
+## 4. Claude Code — 使用 CDP 注入的完整設定
+
+本節說明在 **Claude Code**（駭客版 / BYOC）中使用 Aegis 的完整三元件設定流程。兩個 MCP 共用同一個 Chrome 實例：Playwright MCP 負責導航，Aegis MCP 則透過 CDP 將卡片憑證直接注入 DOM。使用者可以在瀏覽器視窗中即時觀看整個注入流程 — 原始卡號絕不進入 Claude 的上下文。
+
+### 架構說明
+
+```
+Chrome (--remote-debugging-port=9222)
+├── Playwright MCP  ──→ Agent 用於瀏覽導航
+└── Aegis MCP       ──→ 透過 CDP 注入真實卡片
+         │
+         └── Claude Code Agent（只看到 ****-****-****-4242）
+```
+
+### 步驟 0 — 以 CDP 模式啟動 Chrome（每次工作階段開始前必須先執行）
+
+```bash
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-aegis-profile
+
+# Linux
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile
+```
+
+> **為什麼需要 `--user-data-dir`？** 若 Chrome 已在執行中，必須使用獨立的 Profile 目錄才能開啟一個新實例並啟用 CDP。若省略此參數，Chrome 會靜默地重用現有實例，CDP 將無法使用。
+
+驗證 CDP 是否已啟動：
+
+```bash
+curl http://localhost:9222/json/version
+# 應回傳含 "Browser"、"webSocketDebuggerUrl" 等欄位的 JSON 物件
+```
+
+**建議的 Shell alias**（加入 `~/.zshrc` 或 `~/.bashrc`）：
+
+```bash
+# macOS
+alias chrome-cdp='"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+
+# Linux
+alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+```
+
+### 步驟 1 — 設定 `.env`
+
+從範例檔複製並填入你的憑證：
+
+```bash
+cp .env.example .env
+```
+
+編輯 `.env`，至少設定以下項目：
+
+```bash
+AEGIS_BYOC_NUMBER=4111111111111111   # 你的真實卡號
+AEGIS_BYOC_CVV=123
+AEGIS_BYOC_EXPIRY=12/27
+AEGIS_BYOC_NAME=Your Name
+
+# 策略設定
+AEGIS_ALLOWED_CATEGORIES=["aws", "cloudflare", "openai"]
+AEGIS_MAX_PER_TX=100.0
+AEGIS_MAX_DAILY=500.0
+AEGIS_BLOCK_LOOPS=true
+```
+
+### 步驟 2 — 將 Aegis MCP 加入 Claude Code
+
+```bash
+claude mcp add aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+```
+
+> `--project` 旗標指定 `uv` 使用的專案目錄，確保 `.env` 檔案與 `aegis_state.db` 相對於正確的位置解析。
+
+### 步驟 3 — 將 Playwright MCP 加入 Claude Code
+
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+```
+
+> 這會將 Playwright MCP 連接到你在步驟 0 啟動的**同一個 Chrome 實例**。兩個 MCP 現在共用同一個瀏覽器視窗。
+
+### 建議加入的 System Prompt
+
+將以下區塊加入你的 Claude Code system prompt（或專案的 `CLAUDE.md`）：
+
+```
+Payment rules:
+- Only call request_virtual_card when you can see credit card input fields on the current page
+- After approval, the system auto-fills the card — just click submit
+- Never manually type any card number or CVV
+- If request_virtual_card is rejected, do not retry — report to user
+```
+
+### 完整工作階段核查清單
+
+1. `chrome-cdp` — 啟動帶有 CDP 的 Chrome
+2. `curl http://localhost:9222/json/version` — 確認 CDP 正常運行
+3. 啟動 Claude Code — 兩個 MCP 會自動連線
+4. 給 Agent 指派一個涉及結帳頁面的任務
+5. Agent 透過 Playwright MCP 導航，透過 Aegis MCP 呼叫 `request_virtual_card`
+6. `AegisBrowserInjector` 透過 CDP 注入真實卡片 — Agent 只看到遮罩後的卡號
+7. Agent 點擊送出；卡片在使用後立即銷毀
 
 ---
 

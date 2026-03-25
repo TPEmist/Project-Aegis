@@ -75,6 +75,7 @@ Project Aegis 基於「雙軌架構」的願景設計，能從開源的本地實
 | **OpenHands** | MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
 | **OpenClaw + browser-use** | MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
 | **NemoClaw（沙箱）** | 沙箱內 MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
+| **Claude Code + Playwright MCP** | Aegis MCP + CDP 注入 | [整合指南 §4](./docs/INTEGRATION_GUIDE.zh-TW.md#4-claude-code--使用-cdp-注入的完整設定) |
 | **自訂 Playwright / Selenium** | Python SDK `AegisClient` | [整合指南](./docs/INTEGRATION_GUIDE.zh-TW.md) |
 | **Skyvern / browser-use** | Python SDK 中間層 | [整合指南](./docs/INTEGRATION_GUIDE.zh-TW.md) |
 
@@ -157,10 +158,58 @@ openclaw mcp add aegis -- uv run python -m aegis.mcp_server
 
 > **注意：** NemoClaw 限制檔案存取權限。請確保 Project-Aegis 複製到 `/sandbox/` 內，以便 agent 能存取。`aegis_state.db` 會建立在沙箱的可寫入目錄中。
 
-**Claude Code：**
+**Claude Code（駭客版 / BYOC — 完整設定）：**
+
+Claude Code 需要三個元件才能啟用即時 CDP 卡片注入功能。Playwright MCP 負責瀏覽網站，Aegis 則將真實卡片憑證注入同一個瀏覽器視窗 — 卡號絕不進入 AI 的上下文。
+
+**步驟 0 — 以 CDP 模式啟動 Chrome（每次工作階段開始前必須先執行）：**
 ```bash
-claude mcp add aegis -- uv run python -m aegis.mcp_server
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-aegis-profile
+
+# Linux
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile
 ```
+> 若 Chrome 已在執行中，`--user-data-dir` 可強制開啟一個獨立的新實例並啟用 CDP。
+> 驗證方式：`curl http://localhost:9222/json/version`
+
+**步驟 1 — 設定 `.env`（從 `.env.example` 複製）：**
+```bash
+cp .env.example .env
+# 編輯 .env：設定 AEGIS_BYOC_NUMBER、AEGIS_BYOC_CVV、AEGIS_BYOC_EXPIRY 等
+```
+
+**步驟 2 — 將 Aegis MCP 加入 Claude Code：**
+```bash
+claude mcp add aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+```
+
+**步驟 3 — 將 Playwright MCP 加入 Claude Code（透過 CDP 連接同一個 Chrome）：**
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+```
+
+**架構說明：**
+```
+Chrome (--remote-debugging-port=9222)
+├── Playwright MCP  ──→ Agent 用於瀏覽導航
+└── Aegis MCP       ──→ 透過 CDP 注入真實卡片
+         │
+         └── Claude Code Agent（只看到 ****-****-****-4242）
+```
+
+**建議加入的 System Prompt：**
+```
+Payment rules:
+- Only call request_virtual_card when you can see credit card input fields on the current page
+- After approval, the system auto-fills the card — just click submit
+- Never manually type any card number or CVV
+- If request_virtual_card is rejected, do not retry — report to user
+```
+
+> 完整步驟指南（含 Shell alias）請參閱 **[docs/INTEGRATION_GUIDE.zh-TW.md §4](./docs/INTEGRATION_GUIDE.zh-TW.md#4-claude-code--使用-cdp-注入的完整設定)**。
 
 **OpenHands：** 加入你的 MCP 設定：
 ```json
@@ -335,6 +384,35 @@ client = AegisClient(
     policy=policy
 )
 ```
+
+### BYOC — 使用自己的信用卡（駭客版）
+
+適合想使用**自己的實體信用卡**而無需 Stripe 帳號的開發者。`LocalVaultProvider` 從環境變數讀取卡片憑證，並透過 CDP 將其注入瀏覽器支付表單 — 原始卡號絕不暴露給 Agent。
+
+**設定以下環境變數（或從 `.env.example` 複製）：**
+```bash
+export AEGIS_BYOC_NUMBER="4111111111111111"   # 你的真實卡號
+export AEGIS_BYOC_CVV="123"
+export AEGIS_BYOC_EXPIRY="12/27"
+export AEGIS_BYOC_NAME="Your Name"            # 可選：持卡人姓名
+# MCP server 會自動使用 LocalVaultProvider
+uv run python -m aegis.mcp_server
+```
+
+**Provider 優先序（高→低）：** Stripe Issuing → BYOC Local → Mock。
+
+若設定了 `AEGIS_STRIPE_KEY`，Stripe 優先。若設定了 `AEGIS_BYOC_NUMBER`（但無 Stripe Key），則使用 `LocalVaultProvider`。若兩者皆未設定，則使用 `MockStripeProvider` 供開發使用。
+
+```python
+from aegis.providers.byoc_local import LocalVaultProvider
+
+client = AegisClient(
+    provider=LocalVaultProvider(),  # 自動從環境變數讀取
+    policy=policy
+)
+```
+
+> **安全提示：** 切勿將真實卡號提交至版本控制。請使用 `.env`（已在 `.gitignore` 中排除）或密鑰管理服務。CDP 注入確保完整卡號僅由本地可信任程序處理，絕不經過 LLM。
 
 ### 使用真實的 Stripe Issuing
 
