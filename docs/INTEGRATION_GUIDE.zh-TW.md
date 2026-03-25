@@ -80,6 +80,7 @@ openclaw mcp add aegis -- uv run python -m aegis.mcp_server
 export AEGIS_ALLOWED_CATEGORIES='["aws", "openai"]'
 export AEGIS_MAX_PER_TX=50.0
 export AEGIS_MAX_DAILY=200.0
+# 護欄模式："keyword"（預設）或 "llm" — 設定選項請見 README §5 步驟三
 export AEGIS_GUARDRAIL_ENGINE=llm
 export AEGIS_LLM_API_KEY=sk-your-openai-api-key
 ```
@@ -376,6 +377,10 @@ AEGIS_ALLOWED_CATEGORIES=["aws", "cloudflare", "openai"]
 AEGIS_MAX_PER_TX=100.0
 AEGIS_MAX_DAILY=500.0
 AEGIS_BLOCK_LOOPS=true
+
+# 護欄模式："keyword"（預設，零成本）或 "llm"（深度語意分析）
+# 完整比較表與 LLM 設定選項請見 README §5 步驟三。
+# AEGIS_GUARDRAIL_ENGINE=keyword
 ```
 
 ### 步驟 2 — 將 Aegis MCP 加入 Claude Code
