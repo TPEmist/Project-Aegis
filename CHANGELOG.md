@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Developer Tools**: Added `AEGIS_UNMASK_CARDS` environment variable to optionally disable card masking (e.g., `****` default) during local testing and E2E validation.
 
+## [0.3.6] - 2026-03-25
+### Added
+- **`aegis-launch` CLI**: One-command Chrome CDP launcher. Auto-discovers Chrome on macOS/Linux/Windows, launches with `--remote-debugging-port` and `--user-data-dir`, polls until ready, and prints the exact `claude mcp add` commands for your machine. Options: `--port`, `--url`, `--profile-dir`, `--print-mcp`.
+- **Billing field auto-fill**: `AegisBrowserInjector` now fills billing detail fields (first name, last name, street, zip, email) from `AEGIS_BILLING_*` env vars in the main page frame, in the same CDP pass as card injection. Returns `{"card_filled": bool, "billing_filled": bool}`.
+
+### Fixed
+- **`inject_payment_info` return type**: Changed from `bool` to `dict` with `card_filled` and `billing_filled` keys. Backwards-compatible (`bool(result)` still works via truthiness of `card_filled`).
+- **Test assertion updated**: `test_injector_no_fields_returns_false` updated to assert the dict return value.
+
+### Changed
+- **Docs restructure**: README slimmed to landing page; INTEGRATION_GUIDE promoted to canonical setup reference with Claude Code as §1, `aegis-launch` as primary Step 0 (manual Chrome launch folded into `<details>`).
+- **Guardrail mode docs**: Full `keyword` vs `llm` comparison table and LLM config options (OpenAI / Ollama / OpenRouter) moved to INTEGRATION_GUIDE §1 as the single source of truth.
+
 ## [0.3.4] - 2026-03-25
 ### Fixed
 - **BYOC Provider Wiring**: `LocalVaultProvider` was not wired into `mcp_server.py`. Real card credentials set via `AEGIS_BYOC_NUMBER` were silently ignored and fell through to `MockStripeProvider`. Added a dedicated BYOC branch to the provider selection logic. Provider priority (high → low): Stripe Issuing → BYOC Local → Mock.
