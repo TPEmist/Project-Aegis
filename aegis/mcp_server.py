@@ -5,6 +5,7 @@ from mcp.server.fastmcp import FastMCP
 from aegis.core.models import PaymentIntent, GuardrailPolicy
 from aegis.providers.stripe_mock import MockStripeProvider
 from aegis.providers.stripe_real import StripeIssuingProvider
+from aegis.providers.byoc_local import LocalVaultProvider
 from aegis.client import AegisClient
 
 mcp = FastMCP("Aegis-Vault")
@@ -33,6 +34,8 @@ policy = GuardrailPolicy(
 
 if stripe_key:
     provider = StripeIssuingProvider(api_key=stripe_key)
+elif os.getenv("AEGIS_BYOC_NUMBER"):
+    provider = LocalVaultProvider()
 else:
     provider = MockStripeProvider()
 
