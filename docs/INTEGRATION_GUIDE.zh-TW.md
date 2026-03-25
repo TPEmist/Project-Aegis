@@ -23,6 +23,17 @@ Chrome (--remote-debugging-port=9222)
 
 ### 步驟 0 — 以 CDP 模式啟動 Chrome（每次工作階段開始前必須先執行）
 
+**推薦 — 使用 `aegis-launch`：**
+
+```bash
+aegis-launch
+```
+
+`aegis-launch` 已包含於 `aegis-pay`。它會自動偵測你系統上的 Chrome，以正確的 CDP 旗標啟動，等待 port 就緒，並印出適合你機器的 `claude mcp add` 指令。執行 `aegis-launch --help` 查看選項（`--port`、`--url`、`--print-mcp`）。
+
+<details>
+<summary>手動替代方案（若偏好自行啟動 Chrome）</summary>
+
 ```bash
 # macOS
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -42,7 +53,7 @@ curl http://localhost:9222/json/version
 # 應回傳含 "Browser"、"webSocketDebuggerUrl" 等欄位的 JSON 物件
 ```
 
-**建議的 Shell alias**（加入 `~/.zshrc` 或 `~/.bashrc`）：
+**Shell alias**（加入 `~/.zshrc` 或 `~/.bashrc`）：
 
 ```bash
 # macOS
@@ -53,7 +64,7 @@ alias chrome-cdp='"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
 ```
 
-> **捷徑：** `aegis-launch`（包含於 `aegis-pay`）可自動完成步驟 0，並印出適合你機器的 `claude mcp add` 指令。執行 `aegis-launch --help` 查看選項。
+</details>
 
 ### 步驟 1 — 設定 `.env`
 
@@ -153,9 +164,8 @@ Payment rules:
 
 ### 完整工作階段核查清單
 
-1. `chrome-cdp` — 啟動帶有 CDP 的 Chrome
-2. `curl http://localhost:9222/json/version` — 確認 CDP 正常運行
-3. 啟動 Claude Code — 兩個 MCP 會自動連線
+1. `aegis-launch` — 啟動 Chrome CDP 並印出 `claude mcp add` 指令
+2. 啟動 Claude Code — 兩個 MCP 會自動連線
 4. 給 Agent 指派一個涉及結帳頁面的任務
 5. Agent 透過 Playwright MCP 導航，透過 Aegis MCP 呼叫 `request_virtual_card`
 6. `AegisBrowserInjector` 透過 CDP 注入真實卡片 — Agent 只看到遮罩後的卡號

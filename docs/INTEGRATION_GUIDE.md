@@ -23,6 +23,17 @@ Chrome (--remote-debugging-port=9222)
 
 ### Step 0 — Launch Chrome with CDP (must be done first, every session)
 
+**Recommended — use `aegis-launch`:**
+
+```bash
+aegis-launch
+```
+
+`aegis-launch` is included with `aegis-pay`. It auto-discovers Chrome on your system, launches it with the correct CDP flags, waits until the port is ready, and then prints the exact `claude mcp add` commands for your machine. Run `aegis-launch --help` for options (`--port`, `--url`, `--print-mcp`).
+
+<details>
+<summary>Manual alternative (if you prefer to launch Chrome yourself)</summary>
+
 ```bash
 # macOS
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -42,7 +53,7 @@ curl http://localhost:9222/json/version
 # Should return a JSON object with "Browser", "webSocketDebuggerUrl", etc.
 ```
 
-**Recommended shell alias** (add to `~/.zshrc` or `~/.bashrc`):
+**Shell alias** (add to `~/.zshrc` or `~/.bashrc`):
 
 ```bash
 # macOS
@@ -53,7 +64,7 @@ alias chrome-cdp='"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
 ```
 
-> **Shortcut:** `aegis-launch` (included with `aegis-pay`) automates Step 0 and prints the exact `claude mcp add` commands for your machine. Run `aegis-launch --help` for options.
+</details>
 
 ### Step 1 — Configure `.env`
 
@@ -153,9 +164,8 @@ Payment rules:
 
 ### Full Session Checklist
 
-1. `chrome-cdp` — launch Chrome with CDP
-2. `curl http://localhost:9222/json/version` — verify CDP is up
-3. Start Claude Code — both MCPs connect automatically
+1. `aegis-launch` — launches Chrome with CDP and prints the `claude mcp add` commands
+2. Start Claude Code — both MCPs connect automatically
 4. Give your agent a task involving a checkout page
 5. Agent navigates via Playwright MCP, calls `request_virtual_card` via Aegis MCP
 6. `AegisBrowserInjector` injects real card via CDP — agent only sees the masked number
