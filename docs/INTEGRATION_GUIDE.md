@@ -138,50 +138,49 @@ export AEGIS_LLM_MODEL=anthropic/claude-3-haiku
 
 ### Step 2 — Add Aegis MCP to Claude Code
 
-**Option A — Global (recommended):** available in every Claude Code session, regardless of working directory.
-
 ```bash
-claude mcp add --scope global aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+claude mcp add --scope user aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
 ```
 
-**Option B — Project-level:** only available when Claude Code is started from the Project-Aegis directory.
-
-```bash
-cd /path/to/Project-Aegis
-claude mcp add aegis -- uv run --project . python -m aegis.mcp_server
-```
-
-> The `--project` flag tells `uv` which directory to use for the `.env` file and `aegis_state.db`. Use the global option if you want `request_virtual_card` available across all your Claude Code projects.
+> `--scope user` stores the registration in `~/.claude.json` — run **once**, available in every Claude Code session forever after. Replace `/path/to/Project-Aegis` with the actual cloned path; this is where `aegis_state.db` and `.env` will be read from.
 
 ### Step 3 — Add Playwright MCP to Claude Code
 
 ```bash
-claude mcp add --scope global playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+claude mcp add --scope user playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
 ```
 
-> This connects Playwright MCP to the **same Chrome instance** you launched in Step 0. Both MCPs now share one browser window. Use `--scope global` so it is available alongside Aegis in any session.
+> **`--cdp-endpoint` is required.** It connects Playwright MCP to the **same Chrome** that Aegis uses for injection. Without it, Playwright runs its own isolated browser and Aegis cannot see the pages — injection will fail with a "could not find card fields" error. Run **once**; persists automatically.
 
 ### Recommended System Prompt Addition
 
-Add the following block to your Claude Code system prompt (or project `CLAUDE.md`):
+Add the following block to your Claude Code system prompt (or project `CLAUDE.md`). This tells the agent to start Chrome if needed and pass `page_url` correctly:
 
 ```
 Payment rules:
+- Before any payment task, verify Chrome CDP is running: curl http://localhost:9222/json/version
+  If it fails, run: aegis-launch
 - Only call request_virtual_card when you can see credit card input fields on the current page
+- Always pass the current page URL as page_url when calling request_virtual_card
 - After approval, the system auto-fills the card — just click submit
 - Never manually type any card number or CVV
 - If request_virtual_card is rejected, do not retry — report to user
 ```
 
-### Full Session Checklist
+### Full Session Flow
 
-1. `aegis-launch` — launches Chrome with CDP and prints the `claude mcp add` commands
-2. Start Claude Code — both MCPs connect automatically
-   - If you changed `.env` since last session, this restart is required for new config to take effect
-4. Give your agent a task involving a checkout page
-5. Agent navigates via Playwright MCP, calls `request_virtual_card` via Aegis MCP
-6. `AegisBrowserInjector` injects real card via CDP — agent only sees the masked number
-7. Agent clicks submit; card is burned after use
+**One-time setup** (human, after cloning):
+
+1. `cp .env.example .env` → fill in your card credentials and policy settings
+2. `aegis-launch --print-mcp` → run the two `claude mcp add` commands it prints
+
+**Every session** (agent handles this if you add the system prompt above):
+
+1. Agent checks if Chrome is running (`curl http://localhost:9222/json/version`) — if not, runs `aegis-launch`
+2. Open Claude Code → both MCPs connect automatically
+3. Agent navigates to checkout via Playwright MCP, calls `request_virtual_card` with `page_url`
+4. Aegis injects real card into the form — agent only sees the masked number
+5. Agent clicks submit; card is burned after use
 
 ---
 

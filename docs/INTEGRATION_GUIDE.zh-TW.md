@@ -138,50 +138,49 @@ export AEGIS_LLM_MODEL=anthropic/claude-3-haiku
 
 ### 步驟 2 — 將 Aegis MCP 加入 Claude Code
 
-**選項 A — 全域（推薦）：** 在任何工作目錄啟動 Claude Code 都能使用。
-
 ```bash
-claude mcp add --scope global aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+claude mcp add --scope user aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
 ```
 
-**選項 B — 專案層級：** 僅在從 Project-Aegis 目錄啟動 Claude Code 時有效。
-
-```bash
-cd /path/to/Project-Aegis
-claude mcp add aegis -- uv run --project . python -m aegis.mcp_server
-```
-
-> `--project` 旗標指定 `uv` 使用的目錄，確保 `.env` 與 `aegis_state.db` 正確解析。若希望 `request_virtual_card` 在所有 Claude Code 專案中都能使用，請選擇全域選項。
+> `--scope user` 將設定存入 `~/.claude.json`，**執行一次即永久生效**，在所有 Claude Code session 中都能使用。將 `/path/to/Project-Aegis` 替換為實際的 clone 路徑，`.env` 與 `aegis_state.db` 將從此目錄讀取。
 
 ### 步驟 3 — 將 Playwright MCP 加入 Claude Code
 
 ```bash
-claude mcp add --scope global playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
+claude mcp add --scope user playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
 ```
 
-> 這會將 Playwright MCP 連接到你在步驟 0 啟動的**同一個 Chrome 實例**。兩個 MCP 現在共用同一個瀏覽器視窗。使用 `--scope global` 確保 Playwright 與 Aegis 在任何 session 中都能一起使用。
+> **`--cdp-endpoint` 是必要的。** 它讓 Playwright MCP 連接到 Aegis 用來注入卡片的**同一個 Chrome**。若省略，Playwright 會啟動自己的獨立瀏覽器，Aegis 看不到你導航的頁面，注入會失敗並出現「找不到卡片欄位」的錯誤。**執行一次即永久生效。**
 
 ### 建議加入的 System Prompt
 
-將以下區塊加入你的 Claude Code system prompt（或專案的 `CLAUDE.md`）：
+將以下區塊加入你的 Claude Code system prompt（或專案的 `CLAUDE.md`）。這會讓 Agent 在需要時自動啟動 Chrome，並正確傳遞 `page_url`：
 
 ```
 Payment rules:
+- Before any payment task, verify Chrome CDP is running: curl http://localhost:9222/json/version
+  If it fails, run: aegis-launch
 - Only call request_virtual_card when you can see credit card input fields on the current page
+- Always pass the current page URL as page_url when calling request_virtual_card
 - After approval, the system auto-fills the card — just click submit
 - Never manually type any card number or CVV
 - If request_virtual_card is rejected, do not retry — report to user
 ```
 
-### 完整工作階段核查清單
+### 完整工作流程
 
-1. `aegis-launch` — 啟動 Chrome CDP 並印出 `claude mcp add` 指令
-2. 啟動 Claude Code — 兩個 MCP 會自動連線
-   - 如果自上次會話以來修改了 `.env`，則必須重啟以使新配置生效
-4. 給 Agent 指派一個涉及結帳頁面的任務
-5. Agent 透過 Playwright MCP 導航，透過 Aegis MCP 呼叫 `request_virtual_card`
-6. `AegisBrowserInjector` 透過 CDP 注入真實卡片 — Agent 只看到遮罩後的卡號
-7. Agent 點擊送出；卡片在使用後立即銷毀
+**一次性設定**（clone 後由人工執行一次）：
+
+1. `cp .env.example .env` → 填入卡片資訊與政策設定
+2. `aegis-launch --print-mcp` → 執行它印出的兩條 `claude mcp add` 指令
+
+**每次工作階段**（若加入上方 System Prompt，Agent 會自動處理）：
+
+1. Agent 確認 Chrome 是否在跑（`curl http://localhost:9222/json/version`）— 若未啟動，執行 `aegis-launch`
+2. 開啟 Claude Code → 兩個 MCP 自動連線
+3. Agent 透過 Playwright MCP 導航到結帳頁，帶 `page_url` 呼叫 `request_virtual_card`
+4. Aegis 將真實卡片注入表單 — Agent 只看到遮罩後的卡號
+5. Agent 點擊送出；卡片用後即焚
 
 ---
 

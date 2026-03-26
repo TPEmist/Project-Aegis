@@ -8,8 +8,12 @@ Stripe and other third-party payment iframes.  Also fills billing detail fields
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
+import urllib.error
+import urllib.request
 from typing import Optional
 
 from aegis.core.state import AegisStateTracker
@@ -173,6 +177,7 @@ class AegisBrowserInjector:
         self,
         seal_id: str,
         cdp_url: str = "http://localhost:9222",
+        page_url: str = "",
     ) -> dict:
         """
         Connect to an existing Chromium browser via CDP, find payment fields
@@ -180,6 +185,15 @@ class AegisBrowserInjector:
         with real card details, then disconnect without closing the browser.
         Also fills billing detail fields (name, address, email) from env vars
         in the main page frame, if the env vars are set.
+
+        Args:
+            seal_id:  The VirtualSeal ID returned by AegisClient.process_payment().
+            cdp_url:  The Chrome DevTools Protocol endpoint (default: http://localhost:9222).
+            page_url: Optional. The checkout page URL currently open in the agent's browser.
+                      If provided and the CDP browser has no open pages, Aegis will
+                      automatically open this URL in the CDP browser before injecting.
+                      Pass this when navigating via Playwright MCP to ensure both
+                      MCPs operate on the same page.
 
         Returns a dict with:
             "card_filled"    — bool: card number field was found and filled.
@@ -223,15 +237,28 @@ class AegisBrowserInjector:
                 # Connect to the *existing* browser — does NOT launch a new instance
                 browser = await pw.chromium.connect_over_cdp(cdp_url)
 
-                contexts = browser.contexts
-                if not contexts or not contexts[0].pages:
+                # Search all contexts (not just contexts[0]) — Playwright MCP may
+                # create pages in a non-default context when sharing the same Chrome.
+                page = self._find_best_page(browser)
+
+                if page is None and page_url:
+                    # Auto-bridge: agent navigated via a different browser instance;
+                    # open the same URL in the CDP browser so injection can proceed.
+                    logger.info(
+                        "AegisBrowserInjector: no open pages in CDP browser — "
+                        "opening page_url: %s", page_url,
+                    )
+                    page = await self._open_url_in_browser(browser, page_url)
+
+                if page is None:
                     logger.warning(
-                        "AegisBrowserInjector: no open pages found via CDP at %s",
-                        cdp_url,
+                        "AegisBrowserInjector: no open pages found via CDP at %s. "
+                        "Ensure aegis-launch is running and Playwright MCP is configured "
+                        "with --cdp-endpoint %s, or pass page_url to request_virtual_card.",
+                        cdp_url, cdp_url,
                     )
                     return result
 
-                page = contexts[0].pages[0]
                 await page.bring_to_front()
 
                 result["card_filled"] = await self._fill_across_frames(
@@ -255,6 +282,55 @@ class AegisBrowserInjector:
                     await browser.close()
                 except Exception:
                     pass
+
+    @staticmethod
+    def _find_best_page(browser):
+        """
+        Search all browser contexts for an open page, preferring checkout/payment URLs.
+
+        Playwright MCP may create pages in a non-default browser context when
+        connecting to a shared CDP Chrome. Checking only contexts[0] misses those
+        pages; this method walks every context to find the best candidate.
+        """
+        CHECKOUT_KEYWORDS = (
+            "checkout", "payment", "donate", "pay", "purchase",
+            "order", "gateway", "cart",
+        )
+        all_pages = [p for ctx in browser.contexts for p in ctx.pages]
+        if not all_pages:
+            return None
+        # Prefer pages whose URL looks like a checkout/payment page
+        for page in all_pages:
+            if any(kw in page.url.lower() for kw in CHECKOUT_KEYWORDS):
+                return page
+        # Fallback: last page (most recently navigated)
+        return all_pages[-1]
+
+    @staticmethod
+    async def _open_url_in_browser(browser, url: str):
+        """
+        Open *url* as a new tab in the CDP browser, wait for it to be interactive,
+        and return the Page object.  Used by the auto-bridge path when page_url is
+        provided but the CDP browser has no open pages.
+        """
+        try:
+            contexts = browser.contexts
+            if not contexts:
+                logger.warning("AegisBrowserInjector: no contexts available to open URL.")
+                return None
+            page = await contexts[0].new_page()
+            await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            # Allow dynamic payment form JS (e.g. Gr4vy, Stripe) to initialise
+            await page.wait_for_timeout(3000)
+            logger.info(
+                "AegisBrowserInjector: auto-bridge opened URL in CDP browser: %s", url
+            )
+            return page
+        except Exception as exc:
+            logger.error(
+                "AegisBrowserInjector: failed to open URL '%s': %s", url, exc
+            )
+            return None
 
     # ------------------------------------------------------------------
     # Internal helpers

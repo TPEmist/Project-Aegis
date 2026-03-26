@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Developer Tools**: Added `AEGIS_UNMASK_CARDS` environment variable to optionally disable card masking (e.g., `****` default) during local testing and E2E validation.
+- **`page_url` parameter for `request_virtual_card`**: Optional parameter that lets the agent pass the current checkout URL. If the CDP browser has no open tabs (e.g., Chrome was restarted mid-session), Aegis auto-opens the URL before injecting. Eliminates the need for manual tab management.
+- **`AegisBrowserInjector._find_best_page`**: Searches all browser contexts (not just `contexts[0]`) for a checkout page, preferring URLs containing payment/checkout keywords. Fixes injection failures when Playwright MCP creates pages in a non-default context.
+- **`AegisBrowserInjector._open_url_in_browser`**: Opens a URL as a new tab in the CDP browser and waits for the payment form JS to initialise. Used by the `page_url` auto-bridge path.
+
+### Fixed
+- **MCP server loads `.env` at startup**: Added `load_dotenv()` call at the top of `mcp_server.py` so environment variables (including `AEGIS_ALLOWED_CATEGORIES`, `AEGIS_AUTO_INJECT`, etc.) are correctly read from `.env` without requiring shell-level exports.
+- **Injection failure error message**: Now explains the most likely cause (two separate browser instances) and the fix (`page_url` parameter or `--cdp-endpoint` config), instead of a generic "could not find card fields" message.
+
+### Changed
+- **Docs — `--scope global` → `--scope user`**: `global` is not a valid Claude Code scope; corrected to `user` (`~/.claude.json`) in both INTEGRATION_GUIDE.md and INTEGRATION_GUIDE.zh-TW.md.
+- **Docs — Setup flow clarified**: One-time setup vs per-session steps are now clearly separated. Agent is responsible for checking/starting Chrome via `aegis-launch`; the `--print-mcp` step is called out as one-time only.
+- **Docs — Removed redundant `request_virtual_card` call example**: `page_url` usage is covered by the tool docstring and the system prompt template; the separate doc section was duplicate and aimed at the wrong audience.
 
 ## [0.3.6] - 2026-03-25
 ### Added

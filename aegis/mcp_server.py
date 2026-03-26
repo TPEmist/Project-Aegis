@@ -70,7 +70,12 @@ if auto_inject:
 # MCP Tool
 # ---------------------------------------------------------------------------
 @mcp.tool()
-async def request_virtual_card(requested_amount: float, target_vendor: str, reasoning: str) -> str:
+async def request_virtual_card(
+    requested_amount: float,
+    target_vendor: str,
+    reasoning: str,
+    page_url: str = "",
+) -> str:
     """Request a one-time virtual credit card for an automated purchase.
 
     IMPORTANT USAGE RULES:
@@ -81,6 +86,9 @@ async def request_virtual_card(requested_amount: float, target_vendor: str, reas
     - If auto-injection is enabled (AEGIS_AUTO_INJECT=true), the card will be
       securely filled into the browser form automatically after approval —
       you only need to click the submit/pay button.
+    - page_url: Pass the current checkout page URL (e.g. from browser_navigate
+      result). Required when using Playwright MCP for navigation — Aegis uses
+      this to sync the page into its CDP browser for injection.
     """
     intent = PaymentIntent(
         agent_id="mcp-agent",
@@ -102,6 +110,7 @@ async def request_virtual_card(requested_amount: float, target_vendor: str, reas
         injection_result = await injector.inject_payment_info(
             seal_id=seal.seal_id,
             cdp_url=cdp_url,
+            page_url=page_url,
         )
 
         # inject_payment_info now returns a dict; support both dict and legacy bool
@@ -117,9 +126,12 @@ async def request_virtual_card(requested_amount: float, target_vendor: str, reas
             # Undo the seal — cancel the budget reservation
             client.state_tracker.mark_used(seal.seal_id)
             return (
-                "Payment rejected. Error: Aegis could not find credit card input "
-                "fields on your active browser tab. Please ensure you have navigated "
-                "to the FINAL checkout form and the card fields are visible, then retry."
+                "Payment rejected. Error: Aegis could not find credit card input fields. "
+                "Most likely cause: you navigated via Playwright MCP but Aegis is looking "
+                "at a different browser instance. Fix: pass the current checkout URL as "
+                "page_url — e.g. request_virtual_card(..., page_url='https://...'). "
+                "Alternatively, ensure Playwright MCP is configured with "
+                "--cdp-endpoint http://localhost:9222 so both MCPs share the same browser."
             )
 
         billing_note = (

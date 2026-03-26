@@ -27,7 +27,7 @@ Guardrails are the "brains" that decide whether a payment should be approved or 
 For agent frameworks evaluating DOMs, Aegis securely fulfills authorized payments without leaking the card directly to the LLM.
 - **AegisBrowserInjector**: Connects strictly out-of-band via CDP (`Chrome DevTools Protocol`). Traverses cross-origin iframes (i.e. Stripe Elements) and auto-populates `<input>` elements safely.
 - **Chrome must be launched with `--remote-debugging-port=9222`** before the injector can attach. Use `--user-data-dir` as well if Chrome is already running (required to open a separate CDP-enabled instance).
-- **When using Playwright MCP** (e.g., with Claude Code), configure it with `--cdp-endpoint http://localhost:9222` so that both Playwright MCP and Aegis MCP share the same Chrome instance. See [docs/INTEGRATION_GUIDE.md §4](./docs/INTEGRATION_GUIDE.md#4-claude-code--full-setup-with-cdp-injection) for the full setup.
+- **When using Playwright MCP** (e.g., with Claude Code), configure it with `--cdp-endpoint http://localhost:9222` so that both Playwright MCP and Aegis MCP share the same Chrome instance. See [docs/INTEGRATION_GUIDE.md §1](./docs/INTEGRATION_GUIDE.md#1-claude-code--full-setup-with-cdp-injection) for the full setup.
 
 ---
 
@@ -78,8 +78,5 @@ The Vault needs more robust management features:
 - New semantic analysis patterns for the `LLMGuardrailEngine`.
 - Integration with other LLM providers (Anthropic, local models via Ollama).
 - Additional guardrail rules for detecting credential-harvesting prompts or unusual spending velocity patterns.
-
-### 4. Billing Field Injection
-Extend `AegisBrowserInjector` to also fill standard DOM billing fields (cardholder name, billing address, email) during the same CDP injection pass. The values should be read from `AEGIS_BILLING_*` environment variables (e.g., `AEGIS_BILLING_NAME`, `AEGIS_BILLING_ADDRESS`, `AEGIS_BILLING_EMAIL`). This avoids the agent having to type billing details manually, while keeping all sensitive data out of the LLM context. See `aegis/browser_injector.py` for the injection logic to extend.
 
 If you have an idea for a feature or a bug fix, please open an issue or submit a Pull Request!
