@@ -68,18 +68,14 @@ Project Aegis 基於「雙軌架構」的願景設計，能從開源的本地實
 5. [The Vault]  Dashboard 記錄交易。虛擬卡立即銷毀。
 ```
 
-### 🌐 支援的瀏覽器 Agent 整合
+### 🌐 支援的整合方式
 
-| 瀏覽器 Agent | 整合方式 | 參考文件 |
-|---|---|---|
-| **OpenHands** | MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
-| **OpenClaw + browser-use** | MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
-| **NemoClaw（沙箱）** | 沙箱內 MCP Tool Call | [快速上手 §5](#5-快速上手--openclaw--nemoclaw--claude-code--openhands) |
-| **Claude Code + Playwright MCP** | Aegis MCP + CDP 注入 | [整合指南 §4](./docs/INTEGRATION_GUIDE.zh-TW.md#4-claude-code--使用-cdp-注入的完整設定) |
-| **自訂 Playwright / Selenium** | Python SDK `AegisClient` | [整合指南](./docs/INTEGRATION_GUIDE.zh-TW.md) |
-| **Skyvern / browser-use** | Python SDK 中間層 | [整合指南](./docs/INTEGRATION_GUIDE.zh-TW.md) |
+| 整合路徑 | 適用框架 |
+|---|---|
+| **MCP Tool** | Claude Code、OpenClaw、NemoClaw、OpenHands，以及任何 MCP 相容的 Host |
+| **Python SDK** | 自訂 Playwright、browser-use、Skyvern、Selenium、gemini-cli |
 
-> 完整程式碼範例（包含 Playwright 注入與 System Prompt 模板）請參閱 **[docs/INTEGRATION_GUIDE.zh-TW.md](./docs/INTEGRATION_GUIDE.zh-TW.md)**。
+> **Claude Code** 支援完整的 CDP 注入 — 卡片自動填入瀏覽器表單，Agent 永遠看不到原始卡號。詳細設定請參閱 **[整合指南](./docs/INTEGRATION_GUIDE.zh-TW.md)**。
 
 ---
 

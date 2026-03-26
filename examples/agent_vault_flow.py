@@ -1,80 +1,112 @@
-import os
-import asyncio
-import sqlite3
-from playwright.async_api import async_playwright
-from aegis.client import AegisClient
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.core.models import PaymentIntent, GuardrailPolicy
+"""
+Project Aegis — Browser Agent + Vault Flow Example
+====================================================
+Demonstrates the full agent payment lifecycle using the Python SDK:
 
-async def agent_workflow():
-    # --- 1. 初始化 Aegis 守衛者 ---
-    # 設定每日預算為 $50
+  1. Agent requests a virtual card via AegisClient
+  2. Aegis evaluates the intent against the guardrail policy
+  3. On approval, the trusted local process injects real credentials
+     into the browser form via Playwright — the agent only ever sees
+     the masked card number
+
+This example uses MockStripeProvider (no real money involved) and a
+local HTML form to ensure the injection step always succeeds in demos.
+For a real checkout page, replace `page.set_content(...)` with
+`page.goto("https://checkout.example.com")` and adjust the selectors.
+
+Run:
+    uv run python examples/agent_vault_flow.py
+"""
+
+import asyncio
+
+from playwright.async_api import async_playwright
+
+from aegis.client import AegisClient
+from aegis.core.models import GuardrailPolicy, PaymentIntent
+from aegis.providers.stripe_mock import MockStripeProvider
+
+DIVIDER = "-" * 60
+
+
+async def agent_workflow() -> None:
+    # ------------------------------------------------------------------ #
+    # 1. Initialise Aegis
+    # ------------------------------------------------------------------ #
     policy = GuardrailPolicy(
         allowed_categories=["Donation", "SaaS", "Wikipedia"],
         max_amount_per_tx=30.0,
-        max_daily_budget=50.0
+        max_daily_budget=50.0,
     )
-    # 使用 MockProvider，但模擬真實發卡
-    provider = MockStripeProvider()
-    client = AegisClient(provider, policy, db_path="aegis_state.db")
+    client = AegisClient(
+        provider=MockStripeProvider(),
+        policy=policy,
+        db_path="aegis_state.db",
+    )
 
-    # --- 2. Agent 請求支付 ---
+    # ------------------------------------------------------------------ #
+    # 2. Agent requests a virtual card
+    # ------------------------------------------------------------------ #
     intent = PaymentIntent(
         agent_id="claude-agent-007",
         requested_amount=25.0,
         target_vendor="Wikipedia",
-        reasoning="I need to support open knowledge via a $25 donation."
+        reasoning="Support open knowledge via a one-time $25 donation.",
     )
-    
-    print(f"\n[Agent] Requesting ${intent.requested_amount} for {intent.target_vendor}...")
+
+    print(DIVIDER)
+    print(f"[Agent]  Requesting ${intent.requested_amount:.2f} for {intent.target_vendor}")
     seal = await client.process_payment(intent)
-    
+
     if seal.status.lower() == "rejected":
-        print(f"[Aegis] 🛑 Payment Rejected: {seal.rejection_reason}")
+        print(f"[Aegis]  ❌ Rejected — {seal.rejection_reason}")
         return
 
-    # 重要：在對話紀錄中，Agent 只能看到遮蔽的卡號
-    print(f"[Agent] ✅ Payment Approved! Seal ID: {seal.seal_id}")
-    print(f"[Agent] Logged Card Number: ****-****-****-{seal.card_number[-4:]} (Protected)")
+    # The agent's context only ever sees the masked number, never the raw PAN
+    print(f"[Aegis]  ✅ Approved  — Seal: {seal.seal_id}")
+    print(f"[Agent]  Card in log : ****-****-****-{seal.card_number[-4:]}  (raw PAN protected)")
 
-    # --- 3. 瀏覽器注入 (受信任環境) ---
-    print("\n[Aegis] Launching secure browser session for injection...")
+    # ------------------------------------------------------------------ #
+    # 3. Trusted local process injects real credentials via Playwright
+    #    This block runs outside the LLM context — the raw PAN is
+    #    retrieved from the local DB and injected directly into the DOM.
+    # ------------------------------------------------------------------ #
+    print(f"\n[Aegis]  Launching secure browser session for credential injection...")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
-        
-        # 導航至測試頁面 (使用我們之前建立的 local test，確保 100% 成功展示)
-        # 我們現場建立一個測試 HTML
-        test_html = """
-        <html><body>
-            <h3>Wikipedia Donation Secure Form</h3>
-            <input id="card_num" placeholder="Card Number">
-            <input id="cvv" placeholder="CVV">
-        </body></html>
-        """
-        await page.set_content(test_html)
-        
-        # 從資料庫讀取「真實資料」(僅限本地受信任工具)
+
+        # Local test form — replace with page.goto(...) for a real checkout
+        await page.set_content("""
+            <html><body style="font-family:sans-serif;padding:2em">
+              <h3>Checkout Form (local test)</h3>
+              <input id="card_num" placeholder="Card Number" style="display:block;margin:8px 0">
+              <input id="cvv"      placeholder="CVV"         style="display:block;margin:8px 0">
+            </body></html>
+        """)
+
+        # Retrieve real credentials from the local vault (never from LLM output)
         details = client.state_tracker.get_seal_details(seal.seal_id)
-        
-        print("[Aegis] Injecting real credentials into the secure form...")
-        await page.fill("#card_num", details['card_number'])
-        await page.fill("#cvv", details['cvv'])
-        
-        # --- 截圖存證 ---
+
+        await page.fill("#card_num", details["card_number"])
+        await page.fill("#cvv",      details["cvv"])
+
         screenshot_path = "agent_injection_proof.png"
         await page.screenshot(path=screenshot_path)
-        print(f"[Aegis] 📸 Screenshot captured: {screenshot_path}")
-        
-        print("[Aegis] Injection successful. Verifying spending limit...")
-        
-        # --- 4. 驗證錢包安全 ---
+        print(f"[Aegis]  Injection complete. Screenshot saved: {screenshot_path}")
+
+        # ---------------------------------------------------------------- #
+        # 4. Vault audit
+        # ---------------------------------------------------------------- #
         spent = client.state_tracker.daily_spend_total
-        print(f"\n[Vault] Current Daily Spend: ${spent} / ${policy.max_daily_budget}")
-        
+        print(f"\n[Vault]  Daily spend : ${spent:.2f} / ${policy.max_daily_budget:.2f}")
+
         await asyncio.sleep(2)
         await browser.close()
-        print("\n[Final] Workflow completed. Wallet is secure.")
+
+    print(f"\n[Done]   Workflow complete. Raw card credentials never left the local process.")
+    print(DIVIDER)
+
 
 if __name__ == "__main__":
     asyncio.run(agent_workflow())
