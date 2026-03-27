@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-26
+
+### Changed
+- **Integration Guide**: Added "Your First Live Test" section at the end of all four integration patterns (Claude Code, Python SDK, Browser Agent, OpenClaw/NemoClaw) with concrete first-run prompts and expected outcomes.
+- **Integration Guide**: Documented that updating `.env` only requires starting a new agent session — no need to remove and re-register the MCP.
+
 ## [0.5.0] - 2026-03-26
 
 ### Changed
@@ -24,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **StripeIssuingProvider Cardholder deduplication**: Cardholder ID is now cached per-instance; no longer creates a new Cardholder on every `issue_card` call.
 
 ### Added
-- **`aegis.__version__`**: Package version is now accessible via `import aegis; aegis.__version__`.
+- **`pop_pay.__version__`**: Package version is now accessible via `import pop_pay; pop_pay.__version__`.
 
 ### Removed
 - **No-op test**: Removed `test_llm_guardrails_error_handling` which contained only `pass` and tested nothing.

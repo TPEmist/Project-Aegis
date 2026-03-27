@@ -79,4 +79,15 @@ The Vault needs more robust management features:
 - Integration with other LLM providers (Anthropic, local models via Ollama).
 - Additional guardrail rules for detecting credential-harvesting prompts or unusual spending velocity patterns.
 
+### 4. Injection Observability
+Based on real-world agent testing, two observability gaps have been identified:
+- **Billing field confirmation**: When `AegisBrowserInjector` auto-fills billing fields (name, address, email), the agent has no way to confirm what was filled without taking a screenshot. The `request_virtual_card` MCP tool should return a summary of which fields were filled and with what values (excluding the card number itself).
+- **Injection failure transparency**: If card field injection fails (e.g. payment form not found, iframe traversal issue), the MCP tool currently returns a generic error. More granular failure codes would help agents diagnose and report the correct remediation to users.
+
+### 5. CDP Injection Resilience
+The `AegisBrowserInjector` handles most common checkout forms and cross-origin Stripe iframes. Contributions are welcome for:
+- Shadow DOM traversal (web components used by some payment processors)
+- Dynamic form detection (forms that render after JS load with non-standard field naming)
+- Automated test fixtures covering more real-world checkout page structures
+
 If you have an idea for a feature or a bug fix, please open an issue or submit a Pull Request!
