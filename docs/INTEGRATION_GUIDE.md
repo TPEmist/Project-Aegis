@@ -182,6 +182,16 @@ Payment rules:
 4. Point One Percent injects real card into the form — agent only sees the masked number
 5. Agent clicks submit; card is burned after use
 
+### Your First Live Test
+
+Once both MCPs are connected, paste this into a new Claude Code conversation:
+
+> Please donate $10 to Wikipedia at https://donate.wikimedia.org. Select **credit card** as the payment method. Use the pop MCP tool to request a virtual card. Fill in the payment details, but **do not submit** — I will review and confirm before proceeding.
+
+**Expected flow:** Agent navigates → selects $10 → clicks "Donate by credit/debit card" → calls `request_virtual_card` → Point One Percent injects card + billing details via CDP → agent waits for your confirmation.
+
+> **If the request is rejected with "Vendor not in allowed categories":** Add `donation` to `POP_ALLOWED_CATEGORIES` in your `.env`, then start a new Claude Code session (no need to re-register the MCP — a new session restarts the server and reloads `.env` automatically).
+
 ---
 
 ## 2. gemini-cli / Python Script Integration
@@ -293,6 +303,20 @@ Supported LLM providers:
 | OpenRouter | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku` |
 | Any OpenAI-compatible | Your endpoint URL | Your model name |
 
+### Your First Live Test
+
+Run the included SDK demo to verify everything is wired correctly:
+
+```bash
+uv run python examples/e2e_demo.py
+```
+
+You should see three scenarios run: an approved payment, a budget-exceeded rejection, and a hallucination loop block — all without a browser or API key. To also verify LLM guardrail mode, run:
+
+```bash
+uv run --extra llm python scripts/test_llm_guardrails.py
+```
+
 ---
 
 ## 3. Browser Agent Middleware (Playwright / browser-use / Skyvern)
@@ -401,6 +425,16 @@ async def browser_agent_with_pop():
 
 asyncio.run(browser_agent_with_pop())
 ```
+
+### Your First Live Test
+
+Run the included Playwright example against a real Wikipedia donation page:
+
+```bash
+uv run python examples/agent_vault_flow.py
+```
+
+The script navigates to the checkout, requests a virtual card from Point One Percent, injects the card details via CDP, and prints the masked card number — the raw PAN never appears in the output.
 
 ### Adapting for browser-use / Skyvern
 
@@ -513,6 +547,16 @@ export POP_LLM_API_KEY=sk-your-openai-api-key
 ```
 
 > **NemoClaw tip:** The System Prompt fragment above is particularly critical in the NemoClaw context, since the agent has broader system-level permissions. Point One Percent becomes the last financial line of defense inside the sandbox.
+
+### Your First Live Test
+
+Once your agent is configured with the system prompt above, try this task:
+
+> Please donate $10 to Wikipedia at https://donate.wikimedia.org. Select **credit card** as the payment method. Use the pop MCP tool to request a virtual card. Fill in the payment details, but **do not submit** — I will review and confirm before proceeding.
+
+If the guardrails approve the request and the card details are injected into the form, Point One Percent is working correctly end-to-end.
+
+> **If the request is rejected with "Vendor not in allowed categories":** Add `donation` to `POP_ALLOWED_CATEGORIES` (env var or `mcp_servers.json`), then restart your agent session.
 
 ---
 

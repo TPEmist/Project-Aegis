@@ -182,6 +182,16 @@ Payment rules:
 4. Point One Percent 將真實卡片注入表單 — Agent 只看到遮罩後的卡號
 5. Agent 點擊送出；卡片用後即焚
 
+### 第一次實測
+
+兩個 MCP 連線後，在新的 Claude Code 對話中貼上以下 prompt：
+
+> 請捐款 10 美元給 Wikipedia，網址 https://donate.wikimedia.org。選擇**信用卡**作為付款方式。使用 pop MCP 工具申請虛擬卡。填妥支付資料，但**請勿送出** — 我會確認後再決定是否提交。
+
+**預期流程：** Agent 導航 → 選擇 $10 → 點擊「Donate by credit/debit card」→ 呼叫 `request_virtual_card` → Point One Percent 透過 CDP 注入卡號與帳單資訊 → Agent 等待你確認。
+
+> **如果請求被拒絕，顯示「Vendor not in allowed categories」：** 在 `.env` 的 `POP_ALLOWED_CATEGORIES` 中加入 `donation`，然後開啟新的 Claude Code session 即可（不需重新註冊 MCP — 新 session 會自動重啟 server 並重新讀取 `.env`）。
+
 ---
 
 ## 2. gemini-cli / Python 腳本整合
@@ -293,6 +303,20 @@ client = AegisClient(
 | OpenRouter | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku` |
 | 任何相容 OpenAI 的端點 | 你的端點 URL | 你的模型名稱 |
 
+### 第一次實測
+
+執行內附的 SDK Demo，確認一切設定正確：
+
+```bash
+uv run python examples/e2e_demo.py
+```
+
+你應該會看到三個情境執行：核准的付款、超出預算的拒絕，以及幻覺迴圈的攔截 — 不需要瀏覽器或 API Key。若要同步驗證 LLM 護欄模式，執行：
+
+```bash
+uv run --extra llm python scripts/test_llm_guardrails.py
+```
+
 ---
 
 ## 3. 瀏覽器 Agent 中間層（Playwright / browser-use / Skyvern）
@@ -401,6 +425,16 @@ async def browser_agent_with_pop():
 
 asyncio.run(browser_agent_with_pop())
 ```
+
+### 第一次實測
+
+執行內附的 Playwright 範例，對真實 Wikipedia 捐款頁面進行完整流程測試：
+
+```bash
+uv run python examples/agent_vault_flow.py
+```
+
+腳本會導航至結帳頁、向 Point One Percent 申請虛擬卡、透過 CDP 注入卡片資訊，並印出遮罩後的卡號 — 原始 PAN 不會出現在任何輸出中。
 
 ### 適用於 browser-use / Skyvern 的調整
 
@@ -513,6 +547,16 @@ export POP_LLM_API_KEY=sk-your-openai-api-key
 ```
 
 > **NemoClaw 提示：** 上方的 System Prompt 片段在 NemoClaw 情境中尤為關鍵，因為沙箱內的 Agent 擁有更廣泛的系統層級權限。Point One Percent 成為沙箱內的最後一道財務防線。
+
+### 第一次實測
+
+Agent 設定完上方的 System Prompt 後，試著交派這個任務：
+
+> 請捐款 10 美元給 Wikipedia，網址 https://donate.wikimedia.org。選擇**信用卡**作為付款方式。使用 pop MCP 工具申請虛擬卡。填妥支付資料，但**請勿送出** — 我會確認後再決定是否提交。
+
+如果護欄核准請求並且卡片資訊被注入表單，代表 Point One Percent 的端對端流程運作正常。
+
+> **如果請求被拒絕，顯示「Vendor not in allowed categories」：** 在環境變數或 `mcp_servers.json` 的 `POP_ALLOWED_CATEGORIES` 中加入 `donation`，然後重啟 agent session。
 
 ---
 
