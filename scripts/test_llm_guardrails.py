@@ -1,15 +1,15 @@
 """
-Project Aegis — LLM Guardrail Engine Test
-==========================================
+Point One Percent — LLM Guardrail Engine Test
+===============================================
 Validates that the LLM guardrail engine correctly approves legitimate
 payments and rejects hallucinations, out-of-category vendors, and
 logically inconsistent reasoning.
 
 Prerequisites (.env):
-    AEGIS_GUARDRAIL_ENGINE=llm
-    AEGIS_LLM_API_KEY=<your key>
-    AEGIS_LLM_BASE_URL=<optional, defaults to OpenAI>
-    AEGIS_LLM_MODEL=<optional, defaults to gpt-4o-mini>
+    POP_GUARDRAIL_ENGINE=llm
+    POP_LLM_API_KEY=<your key>
+    POP_LLM_BASE_URL=<optional, defaults to OpenAI>
+    POP_LLM_MODEL=<optional, defaults to gpt-4o-mini>
 
 Run:
     uv run python scripts/test_llm_guardrails.py
@@ -23,8 +23,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from aegis.core.models import GuardrailPolicy, PaymentIntent
-from aegis.engine.llm_guardrails import LLMGuardrailEngine
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.engine.llm_guardrails import LLMGuardrailEngine
 
 DIVIDER = "=" * 60
 
@@ -38,7 +38,7 @@ async def run_scenario(
 ) -> bool:
     """Run one scenario and return True if the result matches the expectation."""
     approved, reason = await engine.evaluate_intent(intent, policy)
-    status = "✅ APPROVED" if approved else "❌ REJECTED"
+    status = "APPROVED" if approved else "REJECTED"
     expected = "approved" if expect_approved else "rejected"
     match = approved == expect_approved
 
@@ -48,7 +48,7 @@ async def run_scenario(
     print(f"  Reasoning : '{intent.reasoning[:80]}{'...' if len(intent.reasoning) > 80 else ''}'")
     print(f"  Result    : {status}")
     print(f"  LLM note  : {reason}")
-    print(f"  Expected  : {expected}  →  {'PASS' if match else 'FAIL ⚠'}")
+    print(f"  Expected  : {expected}  ->  {'PASS' if match else 'FAIL'}")
     return match
 
 
@@ -56,18 +56,18 @@ async def main() -> None:
     # ------------------------------------------------------------------ #
     # Preflight checks
     # ------------------------------------------------------------------ #
-    api_key = os.getenv("AEGIS_LLM_API_KEY")
+    api_key = os.getenv("POP_LLM_API_KEY")
     if not api_key:
-        print("ERROR: AEGIS_LLM_API_KEY is not set.")
+        print("ERROR: POP_LLM_API_KEY is not set.")
         print("  Add it to your .env file and re-run.")
         print("  See docs/INTEGRATION_GUIDE.md §1 'Guardrail Mode Configuration'.")
         sys.exit(1)
 
-    base_url   = os.getenv("AEGIS_LLM_BASE_URL")        # None = OpenAI default
-    model_name = os.getenv("AEGIS_LLM_MODEL", "gpt-4o-mini")
+    base_url   = os.getenv("POP_LLM_BASE_URL")        # None = OpenAI default
+    model_name = os.getenv("POP_LLM_MODEL", "gpt-4o-mini")
 
     print(DIVIDER)
-    print(" Project Aegis — LLM Guardrail Engine Test")
+    print(" Point One Percent — LLM Guardrail Engine Test")
     print(f" Endpoint : {base_url or 'OpenAI (default)'}")
     print(f" Model    : {model_name}")
     print(DIVIDER)
@@ -150,34 +150,30 @@ async def main() -> None:
     print(DIVIDER)
 
     if passed < total:
-        print("\n⚠  Some scenarios did not match expectations.")
+        print("\n  Some scenarios did not match expectations.")
         print("  This may indicate a model behaviour difference. Review the LLM notes above.")
         sys.exit(1)
 
     print("""
-✅  Aegis is fully configured and ready to use.
-
-━━━  Next: connect your agent  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Point One Percent is fully configured and ready to use.
 
 Before your first live session, complete two steps:
 
   1. Register the MCP servers in Claude Code:
        See docs/INTEGRATION_GUIDE.md §1 "Steps 2 & 3"
-       (run aegis-launch --print-mcp to get the exact commands)
+       (run pop-launch --print-mcp to get the exact commands)
 
   2. Add the Payment Rules block to your system prompt or CLAUDE.md:
        See docs/INTEGRATION_GUIDE.md §1 "Recommended System Prompt Addition"
 
-━━━  Suggested first test  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 Once your MCP servers are connected, try asking your agent:
 
-  "Please donate $10 to Wikipedia. Always pay via Aegis for future
+  "Please donate $10 to Wikipedia. Always pay via Point One Percent for future
    transactions. Fill in the payment details but do not submit —
    I will review and confirm before proceeding."
 
-This exercises the full flow: browser navigation → Aegis guardrail
-evaluation → CDP card injection → human confirmation before submit.
+This exercises the full flow: browser navigation -> guardrail
+evaluation -> CDP card injection -> human confirmation before submit.
 """)
 
 

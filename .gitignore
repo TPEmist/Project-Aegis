@@ -12,7 +12,7 @@ wheels/
 # Project specific
 .env
 *.db
-aegis_state.db
+pop_state.db
 MEMORY.md
 skills/
 run_parallel.sh
@@ -23,3 +23,4 @@ build/
 README.pypi.md
 .pytest_cache/
 local_tests/
+v0.4.1_DEV_PLAN.md

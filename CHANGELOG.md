@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-26
+
+### Changed
+- **Project renamed**: "Project Aegis" → "Point One Percent"; PyPI package `aegis-pay` → `pop-pay`; Python module `aegis` → `pop_pay`; env vars `AEGIS_*` → `POP_*`; CLI `aegis-launch` → `pop-launch`; DB file `aegis_state.db` → `pop_state.db`; MCP server name `aegis` → `pop`.
+- **Tagline added**: "it only takes 0.1% of Hallucination to drain 100% of your wallet."
+- **GitHub repo**: https://github.com/TPEmist/Point-One-Percent
+
 ## [0.4.0] - 2026-03-25
 
 ### Fixed

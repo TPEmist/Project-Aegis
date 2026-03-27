@@ -1,6 +1,6 @@
 import pytest
-from aegis.core.models import GuardrailPolicy, PaymentIntent
-from aegis.engine.guardrails import GuardrailEngine
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.engine.guardrails import GuardrailEngine
 
 @pytest.mark.asyncio
 async def test_guardrail_scenario_a_success():

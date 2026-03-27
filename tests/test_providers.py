@@ -1,6 +1,6 @@
 import pytest
-from aegis.core.models import GuardrailPolicy, PaymentIntent
-from aegis.providers.stripe_mock import MockStripeProvider
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.providers.stripe_mock import MockStripeProvider
 
 @pytest.mark.asyncio
 async def test_issue_card_success():

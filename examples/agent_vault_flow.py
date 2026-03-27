@@ -1,10 +1,10 @@
 """
-Project Aegis — Browser Agent + Vault Flow Example
-====================================================
+Point One Percent — Browser Agent + Vault Flow Example
+========================================================
 Demonstrates the full agent payment lifecycle using the Python SDK:
 
   1. Agent requests a virtual card via AegisClient
-  2. Aegis evaluates the intent against the guardrail policy
+  2. Point One Percent evaluates the intent against the guardrail policy
   3. On approval, the trusted local process injects real credentials
      into the browser form via Playwright — the agent only ever sees
      the masked card number
@@ -22,16 +22,16 @@ import asyncio
 
 from playwright.async_api import async_playwright
 
-from aegis.client import AegisClient
-from aegis.core.models import GuardrailPolicy, PaymentIntent
-from aegis.providers.stripe_mock import MockStripeProvider
+from pop_pay.client import AegisClient
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.providers.stripe_mock import MockStripeProvider
 
 DIVIDER = "-" * 60
 
 
 async def agent_workflow() -> None:
     # ------------------------------------------------------------------ #
-    # 1. Initialise Aegis
+    # 1. Initialise Point One Percent
     # ------------------------------------------------------------------ #
     policy = GuardrailPolicy(
         allowed_categories=["Donation", "SaaS", "Wikipedia"],
@@ -41,7 +41,7 @@ async def agent_workflow() -> None:
     client = AegisClient(
         provider=MockStripeProvider(),
         policy=policy,
-        db_path="aegis_state.db",
+        db_path="pop_state.db",
     )
 
     # ------------------------------------------------------------------ #
@@ -59,11 +59,11 @@ async def agent_workflow() -> None:
     seal = await client.process_payment(intent)
 
     if seal.status.lower() == "rejected":
-        print(f"[Aegis]  ❌ Rejected — {seal.rejection_reason}")
+        print(f"[POP]    Rejected — {seal.rejection_reason}")
         return
 
     # The agent's context only ever sees the masked number, never the raw PAN
-    print(f"[Aegis]  ✅ Approved  — Seal: {seal.seal_id}")
+    print(f"[POP]    Approved  — Seal: {seal.seal_id}")
     print(f"[Agent]  Card in log : ****-****-****-{seal.card_number[-4:]}  (raw PAN protected)")
 
     # ------------------------------------------------------------------ #
@@ -71,7 +71,7 @@ async def agent_workflow() -> None:
     #    This block runs outside the LLM context — the raw PAN is
     #    retrieved from the local DB and injected directly into the DOM.
     # ------------------------------------------------------------------ #
-    print(f"\n[Aegis]  Launching secure browser session for credential injection...")
+    print(f"\n[POP]    Launching secure browser session for credential injection...")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
@@ -93,7 +93,7 @@ async def agent_workflow() -> None:
 
         screenshot_path = "agent_injection_proof.png"
         await page.screenshot(path=screenshot_path)
-        print(f"[Aegis]  Injection complete. Screenshot saved: {screenshot_path}")
+        print(f"[POP]    Injection complete. Screenshot saved: {screenshot_path}")
 
         # ---------------------------------------------------------------- #
         # 4. Vault audit

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from aegis.core.models import GuardrailPolicy, PaymentIntent, VirtualSeal
-from aegis.providers.stripe_real import StripeIssuingProvider
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent, VirtualSeal
+from pop_pay.providers.stripe_real import StripeIssuingProvider
 import stripe
 
 @pytest.fixture
@@ -43,7 +43,7 @@ async def test_issue_card_success(provider):
         # Verify cardholder creation
         mock_ch_create.assert_called_once_with(
             type='individual',
-            name='Aegis Agent',
+            name='POP Agent',
             billing={
                 'address': {
                     'line1': '123 AI St',

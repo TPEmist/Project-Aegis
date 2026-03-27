@@ -1,8 +1,8 @@
 import uuid
 import random
 from datetime import datetime, timedelta
-from aegis.providers.base import VirtualCardProvider
-from aegis.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
+from pop_pay.providers.base import VirtualCardProvider
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
 
 class MockStripeProvider(VirtualCardProvider):
     async def issue_card(self, intent: PaymentIntent, policy: GuardrailPolicy) -> VirtualSeal:

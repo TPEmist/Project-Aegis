@@ -1,4 +1,4 @@
-from aegis.core.models import PaymentIntent, GuardrailPolicy
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 
 class GuardrailEngine:
     async def evaluate_intent(self, intent: PaymentIntent, policy: GuardrailPolicy) -> tuple[bool, str]:

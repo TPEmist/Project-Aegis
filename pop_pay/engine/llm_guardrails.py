@@ -1,7 +1,7 @@
 import json
 import openai
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
-from aegis.core.models import PaymentIntent, GuardrailPolicy
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 
 class LLMGuardrailEngine:
     def __init__(self, api_key: str = None, base_url: str = None, model: str = 'gpt-4o-mini', use_json_mode: bool = True):

@@ -1,11 +1,11 @@
 import uuid
-from aegis.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
-from aegis.providers.base import VirtualCardProvider
-from aegis.engine.guardrails import GuardrailEngine
-from aegis.core.state import AegisStateTracker
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
+from pop_pay.providers.base import VirtualCardProvider
+from pop_pay.engine.guardrails import GuardrailEngine
+from pop_pay.core.state import AegisStateTracker
 
 class AegisClient:
-    def __init__(self, provider: VirtualCardProvider, policy: GuardrailPolicy, engine: GuardrailEngine = None, db_path: str = "aegis_state.db"):
+    def __init__(self, provider: VirtualCardProvider, policy: GuardrailPolicy, engine: GuardrailEngine = None, db_path: str = "pop_state.db"):
         self.provider = provider
         self.policy = policy
         self.state_tracker = AegisStateTracker(db_path=db_path)

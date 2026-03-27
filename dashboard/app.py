@@ -5,12 +5,12 @@ from datetime import date
 import os
 
 # Set page config
-st.set_page_config(page_title="The Vault - Aegis Dashboard", layout="wide")
+st.set_page_config(page_title="The Vault - Point One Percent Dashboard", layout="wide")
 
-st.title("🛡️ The Vault - AgentPay Dashboard")
+st.title("The Vault - AgentPay Dashboard")
 
 # Database path - located in project root
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "aegis_state.db"))
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pop_state.db"))
 
 # Sidebar
 st.sidebar.header("Vault Settings")
@@ -24,7 +24,7 @@ def load_data():
     if not os.path.exists(DB_PATH):
         # Return empty structures if DB doesn't exist
         return pd.DataFrame(columns=["seal_id", "amount", "vendor", "status", "timestamp"]), 0.0
-    
+
     with sqlite3.connect(DB_PATH) as conn:
         try:
             # Main Screen: Load all issued seals
@@ -32,7 +32,7 @@ def load_data():
         except (pd.errors.DatabaseError, sqlite3.OperationalError):
             # Table doesn't exist yet
             issued_df = pd.DataFrame(columns=["seal_id", "amount", "vendor", "status", "timestamp"])
-            
+
         try:
             # Budget Tracking: Query daily_budget for today's spent_amount
             today = date.today().isoformat()
@@ -41,7 +41,7 @@ def load_data():
             spent_today = budget_df['spent_amount'].iloc[0] if not budget_df.empty else 0.0
         except (pd.errors.DatabaseError, sqlite3.OperationalError):
             spent_today = 0.0
-            
+
     return issued_df, spent_today
 
 # Load data
@@ -63,7 +63,7 @@ st.progress(progress_val)
 st.write("---")
 
 # Main Screen: Issued Seals
-st.subheader("💳 Issued Seals & Activity")
+st.subheader("Issued Seals & Activity")
 if not issued_df.empty:
     st.dataframe(issued_df, use_container_width=True)
 else:
@@ -71,7 +71,7 @@ else:
 
 # Rejected Summary (Optional)
 st.write("---")
-st.subheader("🚫 Rejected Summary")
+st.subheader("Rejected Summary")
 if not issued_df.empty and 'status' in issued_df.columns:
     rejected_df = issued_df[issued_df['status'].str.lower() == 'rejected']
     if not rejected_df.empty:
@@ -82,4 +82,4 @@ else:
     st.info("No data available to show rejected attempts.")
 
 st.write("---")
-st.markdown("*Aegis Project MVP Dashboard - Live Database Stream*")
+st.markdown("*Point One Percent MVP Dashboard - Live Database Stream*")

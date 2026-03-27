@@ -1,5 +1,5 @@
 import pytest
-from aegis.core.models import GuardrailPolicy, PaymentIntent, VirtualSeal
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent, VirtualSeal
 
 def test_guardrail_policy():
     policy = GuardrailPolicy(

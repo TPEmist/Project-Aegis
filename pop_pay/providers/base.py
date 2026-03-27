@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from aegis.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
 
 class VirtualCardProvider(ABC):
     @abstractmethod

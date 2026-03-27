@@ -1,26 +1,26 @@
 import os
 import uuid
 from dotenv import load_dotenv
-from aegis.providers.base import VirtualCardProvider
-from aegis.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
+from pop_pay.providers.base import VirtualCardProvider
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
 
 class LocalVaultProvider(VirtualCardProvider):
     def __init__(self):
         load_dotenv()
-        self.card_number = os.getenv("AEGIS_BYOC_NUMBER")
-        self.exp_month = os.getenv("AEGIS_BYOC_EXP_MONTH")
-        self.exp_year = os.getenv("AEGIS_BYOC_EXP_YEAR")
-        self.cvv = os.getenv("AEGIS_BYOC_CVV")
+        self.card_number = os.getenv("POP_BYOC_NUMBER")
+        self.exp_month = os.getenv("POP_BYOC_EXP_MONTH")
+        self.exp_year = os.getenv("POP_BYOC_EXP_YEAR")
+        self.cvv = os.getenv("POP_BYOC_CVV")
 
         # Billing fields are optional — empty string means "not configured"
-        self._billing_first_name = os.getenv("AEGIS_BILLING_FIRST_NAME", "").strip()
-        self._billing_last_name  = os.getenv("AEGIS_BILLING_LAST_NAME", "").strip()
-        self._billing_street     = os.getenv("AEGIS_BILLING_STREET", "").strip()
-        self._billing_zip        = os.getenv("AEGIS_BILLING_ZIP", "").strip()
-        self._billing_email      = os.getenv("AEGIS_BILLING_EMAIL", "").strip()
+        self._billing_first_name = os.getenv("POP_BILLING_FIRST_NAME", "").strip()
+        self._billing_last_name  = os.getenv("POP_BILLING_LAST_NAME", "").strip()
+        self._billing_street     = os.getenv("POP_BILLING_STREET", "").strip()
+        self._billing_zip        = os.getenv("POP_BILLING_ZIP", "").strip()
+        self._billing_email      = os.getenv("POP_BILLING_EMAIL", "").strip()
 
         if not all([self.card_number, self.exp_month, self.exp_year, self.cvv]):
-            raise ValueError("Missing BYOC environment variables. Please check AEGIS_BYOC_NUMBER, AEGIS_BYOC_EXP_MONTH, AEGIS_BYOC_EXP_YEAR, AEGIS_BYOC_CVV in .env.")
+            raise ValueError("Missing BYOC environment variables. Please check POP_BYOC_NUMBER, POP_BYOC_EXP_MONTH, POP_BYOC_EXP_YEAR, POP_BYOC_CVV in .env.")
 
     @property
     def billing_info(self) -> dict:

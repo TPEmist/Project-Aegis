@@ -9,11 +9,11 @@ test_v03_features.py — Tests for v0.3.0 features:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from aegis.client import AegisClient
-from aegis.engine.guardrails import GuardrailEngine
-from aegis.engine.llm_guardrails import LLMGuardrailEngine
-from aegis.core.models import GuardrailPolicy, PaymentIntent
-from aegis.providers.stripe_mock import MockStripeProvider
+from pop_pay.client import AegisClient
+from pop_pay.engine.guardrails import GuardrailEngine
+from pop_pay.engine.llm_guardrails import LLMGuardrailEngine
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.providers.stripe_mock import MockStripeProvider
 
 
 # ---------------------------------------------------------------------------
@@ -57,17 +57,17 @@ async def test_llm_engine_config():
 @pytest.mark.asyncio
 async def test_mcp_server_env_logic(monkeypatch):
     import json
-    monkeypatch.setenv("AEGIS_ALLOWED_CATEGORIES", '["openai", "anthropic"]')
-    monkeypatch.setenv("AEGIS_MAX_PER_TX", "250.0")
-    monkeypatch.setenv("AEGIS_AUTO_INJECT", "false")
+    monkeypatch.setenv("POP_ALLOWED_CATEGORIES", '["openai", "anthropic"]')
+    monkeypatch.setenv("POP_MAX_PER_TX", "250.0")
+    monkeypatch.setenv("POP_AUTO_INJECT", "false")
 
     import importlib
-    import aegis.mcp_server
-    importlib.reload(aegis.mcp_server)
+    import pop_pay.mcp_server
+    importlib.reload(pop_pay.mcp_server)
 
-    assert aegis.mcp_server.policy.allowed_categories == ["openai", "anthropic"]
-    assert aegis.mcp_server.policy.max_amount_per_tx == 250.0
-    assert aegis.mcp_server.injector is None  # auto_inject=false
+    assert pop_pay.mcp_server.policy.allowed_categories == ["openai", "anthropic"]
+    assert pop_pay.mcp_server.policy.max_amount_per_tx == 250.0
+    assert pop_pay.mcp_server.injector is None  # auto_inject=false
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +75,8 @@ async def test_mcp_server_env_logic(monkeypatch):
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_injector_no_fields_returns_false():
-    from aegis.injector import AegisBrowserInjector
-    from aegis.core.state import AegisStateTracker
+    from pop_pay.injector import AegisBrowserInjector
+    from pop_pay.core.state import AegisStateTracker
 
     tracker = AegisStateTracker(db_path=":memory:")
     # Insert a fake seal with card details
@@ -115,10 +115,10 @@ async def test_injector_no_fields_returns_false():
     # Mock playwright at the system level since it's an optional dependency
     mock_playwright_module = MagicMock()
     mock_playwright_module.async_api.async_playwright = MagicMock(return_value=MockPlaywrightCtx())
-    
+
     with patch.dict("sys.modules", {"playwright": mock_playwright_module, "playwright.async_api": mock_playwright_module.async_api}):
         # Need to import inside patch context
-        from aegis.injector import AegisBrowserInjector as Inj
+        from pop_pay.injector import AegisBrowserInjector as Inj
         inj = Inj(tracker)
         result = await inj.inject_payment_info("seal-abc")
 
@@ -131,7 +131,7 @@ async def test_injector_no_fields_returns_false():
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_langchain_tool_injector_failure_feedback():
-    from aegis.tools.langchain import AegisPaymentTool
+    from pop_pay.tools.langchain import AegisPaymentTool
 
     policy = GuardrailPolicy(
         allowed_categories=["cloud"],

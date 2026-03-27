@@ -2,8 +2,8 @@ import os
 from typing import Type, Any, Optional
 from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool
-from aegis.core.models import PaymentIntent
-from aegis.client import AegisClient
+from pop_pay.core.models import PaymentIntent
+from pop_pay.client import AegisClient
 
 
 class AegisPaymentInput(BaseModel):
@@ -13,7 +13,7 @@ class AegisPaymentInput(BaseModel):
 
 
 class AegisPaymentTool(BaseTool):
-    name: str = "aegis_payment_tool"
+    name: str = "pop_payment_tool"
     description: str = (
         "Use this tool to request a one-time virtual card for an automated purchase. "
         "ONLY call this tool when you are on the FINAL checkout page and can visually "
@@ -89,7 +89,7 @@ class AegisPaymentTool(BaseTool):
                 # Cancel the budget reservation — treat as if never issued
                 self.client.state_tracker.mark_used(seal.seal_id)
                 return (
-                    "Payment rejected. Error: Aegis could not find credit card input "
+                    "Payment rejected. Error: Point One Percent could not find credit card input "
                     "fields on your active browser tab. Please ensure you have navigated "
                     "to the FINAL checkout form and the card fields are visible, then retry."
                 )

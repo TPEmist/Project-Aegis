@@ -1,35 +1,35 @@
 [English](./INTEGRATION_GUIDE.md) | [中文](./INTEGRATION_GUIDE.zh-TW.md)
 
-# Aegis Integration Guide
+# Point One Percent Integration Guide
 
-> **For developers** who want to embed Aegis as the financial middleware in their agentic workflows.
+> **For developers** who want to embed Point One Percent as the financial middleware in their agentic workflows.
 > This guide covers four integration patterns: **Claude Code (BYOC + CDP injection)**, **Python SDK / gemini-cli**, **browser-agent middleware (Playwright / browser-use / Skyvern)**, and **OpenClaw/NemoClaw System Prompts**.
 
 ---
 
 ## 1. Claude Code — Full Setup with CDP Injection
 
-This section covers the complete three-component setup for using Aegis with **Claude Code** (Hacker Edition / BYOC). Both MCPs share the same Chrome instance: Playwright MCP handles navigation while Aegis MCP injects card credentials directly into the DOM via CDP. The user can watch the entire flow live in the browser — the raw card number never enters Claude's context.
+This section covers the complete three-component setup for using Point One Percent with **Claude Code** (Hacker Edition / BYOC). Both MCPs share the same Chrome instance: Playwright MCP handles navigation while Point One Percent MCP injects card credentials directly into the DOM via CDP. The user can watch the entire flow live in the browser — the raw card number never enters Claude's context.
 
 ### Architecture
 
 ```
 Chrome (--remote-debugging-port=9222)
 ├── Playwright MCP  ──→ agent uses for navigation
-└── Aegis MCP       ──→ injects real card via CDP
+└── POP MCP         ──→ injects real card via CDP
          │
          └── Claude Code Agent (only sees ****-****-****-4242)
 ```
 
 ### Step 0 — Launch Chrome with CDP (must be done first, every session)
 
-**Recommended — use `aegis-launch`:**
+**Recommended — use `pop-launch`:**
 
 ```bash
-aegis-launch
+pop-launch
 ```
 
-`aegis-launch` is included with `aegis-pay`. It auto-discovers Chrome on your system, launches it with the correct CDP flags, waits until the port is ready, and then prints the exact `claude mcp add` commands for your machine. Run `aegis-launch --help` for options (`--port`, `--url`, `--print-mcp`).
+`pop-launch` is included with `pop-pay`. It auto-discovers Chrome on your system, launches it with the correct CDP flags, waits until the port is ready, and then prints the exact `claude mcp add` commands for your machine. Run `pop-launch --help` for options (`--port`, `--url`, `--print-mcp`).
 
 <details>
 <summary>Manual alternative (if you prefer to launch Chrome yourself)</summary>
@@ -38,10 +38,10 @@ aegis-launch
 # macOS
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --remote-debugging-port=9222 \
-  --user-data-dir=/tmp/chrome-aegis-profile
+  --user-data-dir=/tmp/chrome-pop-profile
 
 # Linux
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-pop-profile
 ```
 
 > **Why `--user-data-dir`?** If Chrome is already running, a separate profile is required to open a new instance with CDP enabled. Without this flag, Chrome silently reuses the existing instance and CDP will not be available.
@@ -58,10 +58,10 @@ curl http://localhost:9222/json/version
 ```bash
 # macOS
 alias chrome-cdp='"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-pop-profile'
 
 # Linux
-alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-aegis-profile'
+alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-pop-profile'
 ```
 
 </details>
@@ -77,34 +77,34 @@ cp .env.example .env
 Edit `.env` and set at minimum:
 
 ```bash
-AEGIS_BYOC_NUMBER=4111111111111111   # Your real card number
-AEGIS_BYOC_CVV=123
-AEGIS_BYOC_EXP_MONTH=12             # Expiry month, e.g. 04
-AEGIS_BYOC_EXP_YEAR=27              # Expiry year, e.g. 31
+POP_BYOC_NUMBER=4111111111111111   # Your real card number
+POP_BYOC_CVV=123
+POP_BYOC_EXP_MONTH=12             # Expiry month, e.g. 04
+POP_BYOC_EXP_YEAR=27              # Expiry year, e.g. 31
 
 # Policy settings
-AEGIS_ALLOWED_CATEGORIES=["aws", "cloudflare", "openai"]
-AEGIS_MAX_PER_TX=100.0
-AEGIS_MAX_DAILY=500.0
-AEGIS_BLOCK_LOOPS=true
+POP_ALLOWED_CATEGORIES=["aws", "cloudflare", "openai"]
+POP_MAX_PER_TX=100.0
+POP_MAX_DAILY=500.0
+POP_BLOCK_LOOPS=true
 
 # Optional: Billing fields for auto-fill (name, address, email)
-# AEGIS_BILLING_FIRST_NAME=John
-# AEGIS_BILLING_LAST_NAME=Doe
-# AEGIS_BILLING_STREET=123 Main St
-# AEGIS_BILLING_ZIP=10001
-# AEGIS_BILLING_EMAIL=john@example.com
+# POP_BILLING_FIRST_NAME=John
+# POP_BILLING_LAST_NAME=Doe
+# POP_BILLING_STREET=123 Main St
+# POP_BILLING_ZIP=10001
+# POP_BILLING_EMAIL=john@example.com
 
 # Guardrail mode: "keyword" (default, zero-cost) or "llm" (deep semantic analysis)
 # See "Guardrail Mode Configuration" below for the full comparison and LLM config options.
-# AEGIS_GUARDRAIL_ENGINE=keyword
+# POP_GUARDRAIL_ENGINE=keyword
 ```
 
-> **⚠️  After editing `.env`, restart your agent session** (e.g. close and reopen Claude Code) for the changes to take effect. The MCP server loads configuration once at startup — it does not hot-reload.
+> **After editing `.env`, restart your agent session** (e.g. close and reopen Claude Code) for the changes to take effect. The MCP server loads configuration once at startup — it does not hot-reload.
 
 ### Guardrail Mode Configuration
 
-By default, Aegis uses the `keyword` engine — a zero-cost, zero-dependency check that blocks obvious hallucination loops and prompt injection phrases. For production or high-value workflows, switch to `llm` mode for deep semantic analysis of each payment reasoning.
+By default, Point One Percent uses the `keyword` engine — a zero-cost, zero-dependency check that blocks obvious hallucination loops and prompt injection phrases. For production or high-value workflows, switch to `llm` mode for deep semantic analysis of each payment reasoning.
 
 | | `keyword` (default) | `llm` |
 |---|---|---|
@@ -117,32 +117,32 @@ By default, Aegis uses the `keyword` engine — a zero-cost, zero-dependency che
 **LLM mode:**
 
 ```bash
-export AEGIS_GUARDRAIL_ENGINE=llm
+export POP_GUARDRAIL_ENGINE=llm
 
 # Option A: OpenAI
-export AEGIS_LLM_API_KEY=sk-...
-export AEGIS_LLM_MODEL=gpt-4o-mini          # default
+export POP_LLM_API_KEY=sk-...
+export POP_LLM_MODEL=gpt-4o-mini          # default
 
 # Option B: Local model via Ollama (free, private)
-export AEGIS_LLM_BASE_URL=http://localhost:11434/v1
-export AEGIS_LLM_MODEL=llama3.2
-# AEGIS_LLM_API_KEY can be set to any non-empty string for Ollama
+export POP_LLM_BASE_URL=http://localhost:11434/v1
+export POP_LLM_MODEL=llama3.2
+# POP_LLM_API_KEY can be set to any non-empty string for Ollama
 
 # Option C: Any OpenAI-compatible endpoint (OpenRouter, vLLM, LM Studio...)
-export AEGIS_LLM_BASE_URL=https://openrouter.ai/api/v1
-export AEGIS_LLM_API_KEY=sk-or-...
-export AEGIS_LLM_MODEL=anthropic/claude-3-haiku
+export POP_LLM_BASE_URL=https://openrouter.ai/api/v1
+export POP_LLM_API_KEY=sk-or-...
+export POP_LLM_MODEL=anthropic/claude-3-haiku
 ```
 
 > **Tip:** Start with `keyword` during development. Switch to `llm` when moving to production or when the agent pipeline is handling real money or untrusted inputs.
 
-### Step 2 — Add Aegis MCP to Claude Code
+### Step 2 — Add Point One Percent MCP to Claude Code
 
 ```bash
-claude mcp add --scope user aegis -- uv run --project /path/to/Project-Aegis python -m aegis.mcp_server
+claude mcp add --scope user pop -- uv run --project /path/to/Point-One-Percent python -m pop_pay.mcp_server
 ```
 
-> `--scope user` stores the registration in `~/.claude.json` — run **once**, available in every Claude Code session forever after. Replace `/path/to/Project-Aegis` with the actual cloned path; this is where `aegis_state.db` and `.env` will be read from.
+> `--scope user` stores the registration in `~/.claude.json` — run **once**, available in every Claude Code session forever after. Replace `/path/to/Point-One-Percent` with the actual cloned path; this is where `pop_state.db` and `.env` will be read from.
 
 ### Step 3 — Add Playwright MCP to Claude Code
 
@@ -150,7 +150,7 @@ claude mcp add --scope user aegis -- uv run --project /path/to/Project-Aegis pyt
 claude mcp add --scope user playwright -- npx @playwright/mcp@latest --cdp-endpoint http://localhost:9222
 ```
 
-> **`--cdp-endpoint` is required.** It connects Playwright MCP to the **same Chrome** that Aegis uses for injection. Without it, Playwright runs its own isolated browser and Aegis cannot see the pages — injection will fail with a "could not find card fields" error. Run **once**; persists automatically.
+> **`--cdp-endpoint` is required.** It connects Playwright MCP to the **same Chrome** that Point One Percent uses for injection. Without it, Playwright runs its own isolated browser and Point One Percent cannot see the pages — injection will fail with a "could not find card fields" error. Run **once**; persists automatically.
 
 ### Recommended System Prompt Addition
 
@@ -159,7 +159,7 @@ Add the following block to your Claude Code system prompt (or project `CLAUDE.md
 ```
 Payment rules:
 - Before any payment task, verify Chrome CDP is running: curl http://localhost:9222/json/version
-  If it fails, run: aegis-launch
+  If it fails, run: pop-launch
 - Only call request_virtual_card when you can see credit card input fields on the current page
 - Always pass the current page URL as page_url when calling request_virtual_card
 - After approval, the system auto-fills the card — just click submit
@@ -172,14 +172,14 @@ Payment rules:
 **One-time setup** (human, after cloning):
 
 1. `cp .env.example .env` → fill in your card credentials and policy settings
-2. `aegis-launch --print-mcp` → run the two `claude mcp add` commands it prints
+2. `pop-launch --print-mcp` → run the two `claude mcp add` commands it prints
 
 **Every session** (agent handles this if you add the system prompt above):
 
-1. Agent checks if Chrome is running (`curl http://localhost:9222/json/version`) — if not, runs `aegis-launch`
+1. Agent checks if Chrome is running (`curl http://localhost:9222/json/version`) — if not, runs `pop-launch`
 2. Open Claude Code → both MCPs connect automatically
 3. Agent navigates to checkout via Playwright MCP, calls `request_virtual_card` with `page_url`
-4. Aegis injects real card into the form — agent only sees the masked number
+4. Point One Percent injects real card into the form — agent only sees the masked number
 5. Agent clicks submit; card is burned after use
 
 ---
@@ -192,12 +192,12 @@ For automation scripts that use `gemini-cli` or a raw Python agent loop, embed `
 
 ```python
 import asyncio
-from aegis.client import AegisClient
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.core.models import GuardrailPolicy, PaymentIntent
+from pop_pay.client import AegisClient
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.core.models import GuardrailPolicy, PaymentIntent
 
 async def run_automated_workflow():
-    # 1. Initialize Aegis at the start of your script
+    # 1. Initialize Point One Percent at the start of your script
     policy = GuardrailPolicy(
         allowed_categories=["SaaS", "API", "Cloud"],
         max_amount_per_tx=50.0,
@@ -207,10 +207,10 @@ async def run_automated_workflow():
     client = AegisClient(
         provider=MockStripeProvider(),  # swap for StripeIssuingProvider in prod
         policy=policy,
-        db_path="aegis_state.db"
+        db_path="pop_state.db"
     )
 
-    # 2. When your script needs to make a purchase, go through Aegis
+    # 2. When your script needs to make a purchase, go through Point One Percent
     intent = PaymentIntent(
         agent_id="gemini-script-001",
         requested_amount=15.0,
@@ -221,10 +221,10 @@ async def run_automated_workflow():
     seal = await client.process_payment(intent)
 
     if seal.status == "Rejected":
-        print(f"🛑 Payment blocked: {seal.rejection_reason}")
+        print(f"Payment blocked: {seal.rejection_reason}")
         return  # halt script — do NOT proceed with a fallback
 
-    print(f"✅ Approved. Seal: {seal.seal_id} | Card: ****-****-****-{seal.card_number[-4:]}")
+    print(f"Approved. Seal: {seal.seal_id} | Card: ****-****-****-{seal.card_number[-4:]}")
 
     # 3. Use the seal_id to execute (burn-after-use enforced)
     result = await client.execute_payment(seal.seal_id, 15.0)
@@ -235,13 +235,13 @@ asyncio.run(run_automated_workflow())
 
 ### Pattern: LangChain Tool Call (for gemini-cli tool integration)
 
-If your `gemini-cli` prompt uses tools, wrap Aegis as a LangChain `BaseTool`:
+If your `gemini-cli` prompt uses tools, wrap Point One Percent as a LangChain `BaseTool`:
 
 ```python
-from aegis.tools.langchain import AegisPaymentTool
-from aegis.client import AegisClient
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.core.models import GuardrailPolicy
+from pop_pay.tools.langchain import AegisPaymentTool
+from pop_pay.client import AegisClient
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.core.models import GuardrailPolicy
 
 policy = GuardrailPolicy(
     allowed_categories=["SaaS", "API"],
@@ -252,10 +252,10 @@ policy = GuardrailPolicy(
 client = AegisClient(MockStripeProvider(), policy)
 
 # Register as a tool in your agent's tool list
-aegis_tool = AegisPaymentTool(client=client, agent_id="gemini-agent")
+pop_tool = AegisPaymentTool(client=client, agent_id="gemini-agent")
 
 # The tool accepts: requested_amount, target_vendor, reasoning
-result = await aegis_tool._arun(
+result = await pop_tool._arun(
     requested_amount=15.0,
     target_vendor="openai",
     reasoning="Need API credits to continue processing user request."
@@ -269,7 +269,7 @@ print(result)
 To use the LLM guardrail engine directly in a Python script (e.g. for local Ollama inference), pass an `LLMGuardrailEngine` instance when constructing `AegisClient`:
 
 ```python
-from aegis.engine.llm_guardrails import LLMGuardrailEngine
+from pop_pay.engine.llm_guardrails import LLMGuardrailEngine
 
 llm_engine = LLMGuardrailEngine(
     base_url="http://localhost:11434/v1",  # Ollama endpoint
@@ -297,7 +297,7 @@ Supported LLM providers:
 
 ## 3. Browser Agent Middleware (Playwright / browser-use / Skyvern)
 
-Browser agents that navigate real websites need to intercept the checkout flow and request a virtual card from Aegis *before* filling in any payment form.
+Browser agents that navigate real websites need to intercept the checkout flow and request a virtual card from Point One Percent *before* filling in any payment form.
 
 ### Architecture
 
@@ -321,7 +321,7 @@ Browser agents that navigate real websites need to intercept the checkout flow a
                         │  request_virtual_card(amount, vendor, reasoning)
                         ▼
 ┌──────────────────────────────────────────────────────┐
-│                 Aegis (This library)                  │
+│          Point One Percent (This library)             │
 │                                                       │
 │  • GuardrailEngine: keyword + optional LLM check      │
 │  • Budget enforcement: daily cap + per-tx limit       │
@@ -350,18 +350,18 @@ The following is a working implementation from [`examples/agent_vault_flow.py`](
 ```python
 import asyncio
 from playwright.async_api import async_playwright
-from aegis.client import AegisClient
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.core.models import PaymentIntent, GuardrailPolicy
+from pop_pay.client import AegisClient
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 
-async def browser_agent_with_aegis():
-    # 1. Initialize Aegis
+async def browser_agent_with_pop():
+    # 1. Initialize Point One Percent
     policy = GuardrailPolicy(
         allowed_categories=["Donation", "SaaS", "Wikipedia"],
         max_amount_per_tx=30.0,
         max_daily_budget=50.0
     )
-    client = AegisClient(MockStripeProvider(), policy, db_path="aegis_state.db")
+    client = AegisClient(MockStripeProvider(), policy, db_path="pop_state.db")
 
     # 2. Browser agent detects a checkout form and requests authorization
     intent = PaymentIntent(
@@ -373,10 +373,10 @@ async def browser_agent_with_aegis():
     seal = await client.process_payment(intent)
 
     if seal.status.lower() == "rejected":
-        print(f"🛑 Aegis blocked payment: {seal.rejection_reason}")
+        print(f"Payment blocked: {seal.rejection_reason}")
         return  # browser agent stops — does NOT attempt to fill the form
 
-    print(f"✅ Aegis approved. Seal: {seal.seal_id}")
+    print(f"Approved. Seal: {seal.seal_id}")
     # The agent's context only sees the masked number — never the real PAN
     print(f"   Card in agent log: ****-****-****-{seal.card_number[-4:]}")
 
@@ -397,9 +397,9 @@ async def browser_agent_with_aegis():
 
     # 4. Mark seal as used (burn-after-use)
     await client.execute_payment(seal.seal_id, 25.0)
-    print("🔥 Card burned. Transaction complete.")
+    print("Card burned. Transaction complete.")
 
-asyncio.run(browser_agent_with_aegis())
+asyncio.run(browser_agent_with_pop())
 ```
 
 ### Adapting for browser-use / Skyvern
@@ -408,9 +408,9 @@ If you're using `browser-use` or Skyvern (which operate with higher-level visual
 
 ```python
 # Pseudo-code for browser-use integration
-class AegisCheckoutInterceptor:
-    def __init__(self, aegis_client: AegisClient):
-        self.client = aegis_client
+class POPCheckoutInterceptor:
+    def __init__(self, pop_client: AegisClient):
+        self.client = pop_client
 
     async def on_checkout_detected(self, amount: float, vendor: str, context: str):
         """Called by browser-use when a payment form is detected."""
@@ -423,7 +423,7 @@ class AegisCheckoutInterceptor:
         seal = await self.client.process_payment(intent)
 
         if seal.status == "Rejected":
-            raise PaymentBlockedError(f"Aegis rejected: {seal.rejection_reason}")
+            raise PaymentBlockedError(f"Point One Percent rejected: {seal.rejection_reason}")
 
         return seal  # pass seal back to browser-use to complete checkout
 
@@ -436,7 +436,7 @@ class AegisCheckoutInterceptor:
 
 ## 4. OpenClaw / NemoClaw — System Prompt Configuration
 
-The most important guardrail you can add is at the **System Prompt level**: instructing the agent that it *must* call Aegis before any payment action, rather than attempting to fill forms directly with real credentials.
+The most important guardrail you can add is at the **System Prompt level**: instructing the agent that it *must* call Point One Percent before any payment action, rather than attempting to fill forms directly with real credentials.
 
 ### Recommended System Prompt Fragment
 
@@ -445,7 +445,7 @@ Add the following block to your OpenClaw or NemoClaw identity file (e.g., `IDENT
 ```markdown
 ## Financial Safety Protocol (REQUIRED)
 
-You are operating under the Aegis Payment Guardrail Protocol. The following rules are NON-NEGOTIABLE:
+You are operating under the Point One Percent Payment Guardrail Protocol. The following rules are NON-NEGOTIABLE:
 
 1. **You MUST call the `request_virtual_card` MCP tool** before attempting any purchase,
    subscription, donation, API credit top-up, or any other financial transaction.
@@ -459,31 +459,31 @@ You are operating under the Aegis Payment Guardrail Protocol. The following rule
 4. **If you find yourself in a loop** (retrying the same failed purchase more than once),
    you MUST stop and request human intervention rather than continuing.
 
-5. The card number returned by Aegis will be masked (e.g., `****-****-****-4242`).
+5. The card number returned by Point One Percent will be masked (e.g., `****-****-****-4242`).
    Do NOT attempt to look up or reconstruct the full card number.
 ```
 
-### OpenClaw: Registering Aegis as an MCP Tool
+### OpenClaw: Registering Point One Percent as an MCP Tool
 
 ```bash
-openclaw mcp add aegis -- uv run python -m aegis.mcp_server
+openclaw mcp add pop -- uv run python -m pop_pay.mcp_server
 ```
 
 Or add to `~/.openclaw/mcp_servers.json`:
 
 ```json
 {
-  "aegis": {
+  "pop": {
     "command": "uv",
-    "args": ["run", "python", "-m", "aegis.mcp_server"],
-    "cwd": "/path/to/Project-Aegis",
+    "args": ["run", "python", "-m", "pop_pay.mcp_server"],
+    "cwd": "/path/to/Point-One-Percent",
     "env": {
-      "AEGIS_ALLOWED_CATEGORIES": "[\"aws\", \"cloudflare\", \"openai\", \"github\"]",
-      "AEGIS_MAX_PER_TX": "100.0",
-      "AEGIS_MAX_DAILY": "500.0",
-      "AEGIS_BLOCK_LOOPS": "true",
-      "AEGIS_GUARDRAIL_ENGINE": "llm",
-      "AEGIS_LLM_API_KEY": "sk-your-openai-api-key"
+      "POP_ALLOWED_CATEGORIES": "[\"aws\", \"cloudflare\", \"openai\", \"github\"]",
+      "POP_MAX_PER_TX": "100.0",
+      "POP_MAX_DAILY": "500.0",
+      "POP_BLOCK_LOOPS": "true",
+      "POP_GUARDRAIL_ENGINE": "llm",
+      "POP_LLM_API_KEY": "sk-your-openai-api-key"
     }
   }
 }
@@ -494,25 +494,25 @@ Or add to `~/.openclaw/mcp_servers.json`:
 NemoClaw's `OpenShell` runtime restricts write access to `/sandbox/` and `/tmp/`.
 
 ```bash
-# Step 1: Clone Aegis inside the sandbox
+# Step 1: Clone Point One Percent inside the sandbox
 nemoclaw my-assistant connect
 cd /sandbox
-git clone https://github.com/TPEmist/Project-Aegis.git
-cd Project-Aegis && uv sync --all-extras
+git clone https://github.com/TPEmist/Point-One-Percent.git
+cd Point-One-Percent && uv sync --all-extras
 
 # Step 2: Register MCP server (while connected to sandbox)
-openclaw mcp add aegis -- uv run python -m aegis.mcp_server
+openclaw mcp add pop -- uv run python -m pop_pay.mcp_server
 
-# Step 3: Set env vars (aegis_state.db will write to /sandbox/Project-Aegis/)
-export AEGIS_ALLOWED_CATEGORIES='["aws", "openai"]'
-export AEGIS_MAX_PER_TX=50.0
-export AEGIS_MAX_DAILY=200.0
+# Step 3: Set env vars (pop_state.db will write to /sandbox/Point-One-Percent/)
+export POP_ALLOWED_CATEGORIES='["aws", "openai"]'
+export POP_MAX_PER_TX=50.0
+export POP_MAX_DAILY=200.0
 # Guardrail mode: "keyword" (default) or "llm" — see §1 "Guardrail Mode Configuration" for options
-export AEGIS_GUARDRAIL_ENGINE=llm
-export AEGIS_LLM_API_KEY=sk-your-openai-api-key
+export POP_GUARDRAIL_ENGINE=llm
+export POP_LLM_API_KEY=sk-your-openai-api-key
 ```
 
-> **NemoClaw tip:** The System Prompt fragment above is particularly critical in the NemoClaw context, since the agent has broader system-level permissions. Aegis becomes the last financial line of defense inside the sandbox.
+> **NemoClaw tip:** The System Prompt fragment above is particularly critical in the NemoClaw context, since the agent has broader system-level permissions. Point One Percent becomes the last financial line of defense inside the sandbox.
 
 ---
 

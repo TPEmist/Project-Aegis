@@ -1,8 +1,8 @@
 import pytest
 import uuid
-from aegis.client import AegisClient
-from aegis.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
-from aegis.providers.base import VirtualCardProvider
+from pop_pay.client import AegisClient
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
+from pop_pay.providers.base import VirtualCardProvider
 
 class MockProvider(VirtualCardProvider):
     async def issue_card(self, intent: PaymentIntent, policy: GuardrailPolicy) -> VirtualSeal:
@@ -62,8 +62,8 @@ async def test_burn_after_use_enforcement():
 
 @pytest.mark.asyncio
 async def test_card_masking_langchain():
-    from aegis.tools.langchain import AegisPaymentTool
-    from aegis.core.models import VirtualSeal
+    from pop_pay.tools.langchain import AegisPaymentTool
+    from pop_pay.core.models import VirtualSeal
     
     policy = GuardrailPolicy(
         allowed_categories=["cloud"],

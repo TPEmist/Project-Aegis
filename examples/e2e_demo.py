@@ -1,6 +1,6 @@
 """
-Project Aegis — End-to-End Demo
-================================
+Point One Percent — End-to-End Demo
+=====================================
 Demonstrates the three core guardrail scenarios using the keyword engine
 (default mode, zero-cost, no API key required).
 
@@ -10,17 +10,17 @@ Run:
 
 import asyncio
 
-from aegis.client import AegisClient
-from aegis.core.models import GuardrailPolicy
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.tools.langchain import AegisPaymentTool
+from pop_pay.client import AegisClient
+from pop_pay.core.models import GuardrailPolicy
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.tools.langchain import AegisPaymentTool
 
 DIVIDER = "=" * 60
 
 
 async def main() -> None:
     print(DIVIDER)
-    print(" Project Aegis — End-to-End Demo")
+    print(" Point One Percent — End-to-End Demo")
     print(" Guardrail mode : KEYWORD  (default, zero-cost, no API key)")
     print(" Card provider  : Mock     (no real money involved)")
     print(DIVIDER)
@@ -99,8 +99,8 @@ such as off-topic purchases or logically inconsistent reasoning:
   full .env reference and provider options (OpenAI, Ollama, OpenRouter, etc.).
 
   1. Add the following to your .env:
-       AEGIS_GUARDRAIL_ENGINE=llm
-       AEGIS_LLM_API_KEY=<your-openai-or-compatible-key>
+       POP_GUARDRAIL_ENGINE=llm
+       POP_LLM_API_KEY=<your-openai-or-compatible-key>
 
   2. Run the LLM guardrail test:
        uv run python scripts/test_llm_guardrails.py

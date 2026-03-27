@@ -16,7 +16,7 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
-from aegis.core.state import AegisStateTracker
+from pop_pay.core.state import AegisStateTracker
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ class AegisBrowserInjector:
         except ImportError:
             logger.error(
                 "playwright is not installed. "
-                "Run: pip install aegis-pay[browser]  or  pip install playwright"
+                "Run: pip install pop-pay[browser]  or  pip install playwright"
             )
             return result
 
@@ -223,11 +223,11 @@ class AegisBrowserInjector:
 
         # Collect billing info from env vars — all optional, skip if empty
         billing_info = {
-            "first_name": os.getenv("AEGIS_BILLING_FIRST_NAME", "").strip(),
-            "last_name":  os.getenv("AEGIS_BILLING_LAST_NAME", "").strip(),
-            "street":     os.getenv("AEGIS_BILLING_STREET", "").strip(),
-            "zip":        os.getenv("AEGIS_BILLING_ZIP", "").strip(),
-            "email":      os.getenv("AEGIS_BILLING_EMAIL", "").strip(),
+            "first_name": os.getenv("POP_BILLING_FIRST_NAME", "").strip(),
+            "last_name":  os.getenv("POP_BILLING_LAST_NAME", "").strip(),
+            "street":     os.getenv("POP_BILLING_STREET", "").strip(),
+            "zip":        os.getenv("POP_BILLING_ZIP", "").strip(),
+            "email":      os.getenv("POP_BILLING_EMAIL", "").strip(),
         }
         has_billing = any(billing_info.values())
 
@@ -253,7 +253,7 @@ class AegisBrowserInjector:
                 if page is None:
                     logger.warning(
                         "AegisBrowserInjector: no open pages found via CDP at %s. "
-                        "Ensure aegis-launch is running and Playwright MCP is configured "
+                        "Ensure pop-launch is running and Playwright MCP is configured "
                         "with --cdp-endpoint %s, or pass page_url to request_virtual_card.",
                         cdp_url, cdp_url,
                     )

@@ -5,28 +5,28 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
-from aegis.core.models import PaymentIntent, GuardrailPolicy
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.providers.stripe_real import StripeIssuingProvider
-from aegis.providers.byoc_local import LocalVaultProvider
-from aegis.client import AegisClient
+from pop_pay.core.models import PaymentIntent, GuardrailPolicy
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.providers.stripe_real import StripeIssuingProvider
+from pop_pay.providers.byoc_local import LocalVaultProvider
+from pop_pay.client import AegisClient
 
-mcp = FastMCP("Aegis-Vault")
+mcp = FastMCP("pop-vault")
 
 # ---------------------------------------------------------------------------
 # Load configuration from environment
 # ---------------------------------------------------------------------------
-allowed_categories = json.loads(os.getenv("AEGIS_ALLOWED_CATEGORIES", '["aws", "cloudflare"]'))
-max_per_tx   = float(os.getenv("AEGIS_MAX_PER_TX", "100.0"))
-max_daily    = float(os.getenv("AEGIS_MAX_DAILY", "500.0"))
-block_loops  = os.getenv("AEGIS_BLOCK_LOOPS", "true").lower() == "true"
-stripe_key   = os.getenv("AEGIS_STRIPE_KEY")
-cdp_url      = os.getenv("AEGIS_CDP_URL", "http://localhost:9222")
-auto_inject  = os.getenv("AEGIS_AUTO_INJECT", "false").lower() == "true"
-engine_type  = os.getenv("AEGIS_GUARDRAIL_ENGINE", "keyword").lower()
-llm_api_key  = os.getenv("AEGIS_LLM_API_KEY", "")
-llm_base_url = os.getenv("AEGIS_LLM_BASE_URL", None)
-llm_model    = os.getenv("AEGIS_LLM_MODEL", "gpt-4o-mini")
+allowed_categories = json.loads(os.getenv("POP_ALLOWED_CATEGORIES", '["aws", "cloudflare"]'))
+max_per_tx   = float(os.getenv("POP_MAX_PER_TX", "100.0"))
+max_daily    = float(os.getenv("POP_MAX_DAILY", "500.0"))
+block_loops  = os.getenv("POP_BLOCK_LOOPS", "true").lower() == "true"
+stripe_key   = os.getenv("POP_STRIPE_KEY")
+cdp_url      = os.getenv("POP_CDP_URL", "http://localhost:9222")
+auto_inject  = os.getenv("POP_AUTO_INJECT", "false").lower() == "true"
+engine_type  = os.getenv("POP_GUARDRAIL_ENGINE", "keyword").lower()
+llm_api_key  = os.getenv("POP_LLM_API_KEY", "")
+llm_base_url = os.getenv("POP_LLM_BASE_URL", None)
+llm_model    = os.getenv("POP_LLM_MODEL", "gpt-4o-mini")
 
 policy = GuardrailPolicy(
     allowed_categories=allowed_categories,
@@ -37,14 +37,14 @@ policy = GuardrailPolicy(
 
 if stripe_key:
     provider = StripeIssuingProvider(api_key=stripe_key)
-elif os.getenv("AEGIS_BYOC_NUMBER"):
+elif os.getenv("POP_BYOC_NUMBER"):
     provider = LocalVaultProvider()
 else:
     provider = MockStripeProvider()
 
 engine = None
 if engine_type == "llm":
-    from aegis.engine.llm_guardrails import LLMGuardrailEngine
+    from pop_pay.engine.llm_guardrails import LLMGuardrailEngine
     engine = LLMGuardrailEngine(
         api_key=llm_api_key,
         base_url=llm_base_url,
@@ -55,12 +55,12 @@ if engine_type == "llm":
 client = AegisClient(provider, policy, engine=engine)
 
 # ---------------------------------------------------------------------------
-# Optional: browser injector (only loaded when AEGIS_AUTO_INJECT=true)
+# Optional: browser injector (only loaded when POP_AUTO_INJECT=true)
 # ---------------------------------------------------------------------------
 injector = None
 if auto_inject:
     try:
-        from aegis.injector import AegisBrowserInjector
+        from pop_pay.injector import AegisBrowserInjector
         injector = AegisBrowserInjector(client.state_tracker)
     except ImportError:
         pass  # playwright not installed — injector disabled silently
@@ -83,11 +83,11 @@ async def request_virtual_card(
       and can visually see the credit card input fields in the browser.
     - DO NOT call this if you have not yet navigated to the checkout form.
     - DO NOT retry with a different reasoning if this tool returns a rejection.
-    - If auto-injection is enabled (AEGIS_AUTO_INJECT=true), the card will be
+    - If auto-injection is enabled (POP_AUTO_INJECT=true), the card will be
       securely filled into the browser form automatically after approval —
       you only need to click the submit/pay button.
     - page_url: Pass the current checkout page URL (e.g. from browser_navigate
-      result). Required when using Playwright MCP for navigation — Aegis uses
+      result). Required when using Playwright MCP for navigation — Point One Percent uses
       this to sync the page into its CDP browser for injection.
     """
     intent = PaymentIntent(
@@ -127,8 +127,8 @@ async def request_virtual_card(
             # Undo the seal — cancel the budget reservation
             client.state_tracker.mark_used(seal.seal_id)
             return (
-                "Payment rejected. Error: Aegis could not find credit card input fields. "
-                "Most likely cause: you navigated via Playwright MCP but Aegis is looking "
+                "Payment rejected. Error: Point One Percent could not find credit card input fields. "
+                "Most likely cause: you navigated via Playwright MCP but Point One Percent is looking "
                 "at a different browser instance. Fix: pass the current checkout URL as "
                 "page_url — e.g. request_virtual_card(..., page_url='https://...'). "
                 "Alternatively, ensure Playwright MCP is configured with "

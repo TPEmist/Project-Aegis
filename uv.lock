@@ -8,74 +8,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "aegis-pay"
-version = "0.4.0"
-source = { editable = "." }
-dependencies = [
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "langchain-core" },
-    { name = "mcp" },
-    { name = "openai" },
-    { name = "playwright" },
-    { name = "streamlit" },
-    { name = "stripe" },
-    { name = "tenacity" },
-]
-browser = [
-    { name = "playwright" },
-]
-dashboard = [
-    { name = "streamlit" },
-]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-langchain = [
-    { name = "langchain-core" },
-]
-llm = [
-    { name = "openai" },
-    { name = "tenacity" },
-]
-mcp = [
-    { name = "mcp" },
-]
-stripe = [
-    { name = "stripe" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "vulture" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aegis-pay", extras = ["llm", "stripe", "langchain", "mcp", "dashboard", "browser"], marker = "extra == 'all'" },
-    { name = "langchain-core", marker = "extra == 'langchain'" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.26.0" },
-    { name = "openai", marker = "extra == 'llm'" },
-    { name = "playwright", marker = "extra == 'browser'", specifier = ">=1.40.0" },
-    { name = "pydantic" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'" },
-    { name = "python-dotenv" },
-    { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.55.0" },
-    { name = "stripe", marker = "extra == 'stripe'" },
-    { name = "tenacity", marker = "extra == 'llm'", specifier = ">=9.1.4" },
-]
-provides-extras = ["llm", "stripe", "langchain", "mcp", "dashboard", "dev", "browser", "all"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "vulture", specifier = ">=2.15" }]
-
-[[package]]
 name = "altair"
 version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1355,6 +1287,74 @@ sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
 ]
+
+[[package]]
+name = "pop-pay"
+version = "0.5.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "langchain-core" },
+    { name = "mcp" },
+    { name = "openai" },
+    { name = "playwright" },
+    { name = "streamlit" },
+    { name = "stripe" },
+    { name = "tenacity" },
+]
+browser = [
+    { name = "playwright" },
+]
+dashboard = [
+    { name = "streamlit" },
+]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+langchain = [
+    { name = "langchain-core" },
+]
+llm = [
+    { name = "openai" },
+    { name = "tenacity" },
+]
+mcp = [
+    { name = "mcp" },
+]
+stripe = [
+    { name = "stripe" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "vulture" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "langchain-core", marker = "extra == 'langchain'" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.26.0" },
+    { name = "openai", marker = "extra == 'llm'" },
+    { name = "playwright", marker = "extra == 'browser'", specifier = ">=1.40.0" },
+    { name = "pop-pay", extras = ["llm", "stripe", "langchain", "mcp", "dashboard", "browser"], marker = "extra == 'all'" },
+    { name = "pydantic" },
+    { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'" },
+    { name = "python-dotenv" },
+    { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.55.0" },
+    { name = "stripe", marker = "extra == 'stripe'" },
+    { name = "tenacity", marker = "extra == 'llm'", specifier = ">=9.1.4" },
+]
+provides-extras = ["llm", "stripe", "langchain", "mcp", "dashboard", "dev", "browser", "all"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "vulture", specifier = ">=2.15" }]
 
 [[package]]
 name = "protobuf"

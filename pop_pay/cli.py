@@ -1,4 +1,4 @@
-"""aegis-launch: Launch Chrome with CDP + optional Playwright MCP setup."""
+"""pop-launch: Launch Chrome with CDP + optional Playwright MCP setup."""
 
 from __future__ import annotations
 
@@ -73,10 +73,10 @@ def _print_mcp_instructions(port: int, project_root: pathlib.Path) -> None:
     """Print the claude mcp add commands the user needs to run."""
     cdp_endpoint = f"http://localhost:{port}"
     print()
-    print("Aegis is ready. Add it to Claude Code with:")
+    print("Point One Percent is ready. Add it to Claude Code with:")
     print()
     print(
-        f"  claude mcp add aegis -- uv run --project {project_root} python -m aegis.mcp_server"
+        f"  claude mcp add pop -- uv run --project {project_root} python -m pop_pay.mcp_server"
     )
     print(
         f"  claude mcp add playwright -- npx @playwright/mcp@latest --cdp-endpoint {cdp_endpoint}"
@@ -87,8 +87,8 @@ def _print_mcp_instructions(port: int, project_root: pathlib.Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="aegis-launch",
-        description="Launch Chrome with CDP remote debugging for Aegis / Playwright MCP.",
+        prog="pop-launch",
+        description="Launch Chrome with CDP remote debugging for Point One Percent / Playwright MCP.",
     )
     parser.add_argument(
         "--port",
@@ -99,8 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--profile-dir",
         type=pathlib.Path,
-        default=pathlib.Path("~/.aegis/chrome-profile"),
-        help="Chrome user-data-dir (default: ~/.aegis/chrome-profile)",
+        default=pathlib.Path("~/.pop/chrome-profile"),
+        help="Chrome user-data-dir (default: ~/.pop/chrome-profile)",
     )
     parser.add_argument(
         "--url",
@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Chrome is ready. Browser: {browser_version}")
 
     if args.print_mcp:
-        # Resolve project root: two levels up from this file (aegis/cli.py -> project root)
+        # Resolve project root: two levels up from this file (pop_pay/cli.py -> project root)
         project_root = pathlib.Path(__file__).resolve().parent.parent
         _print_mcp_instructions(args.port, project_root)
 

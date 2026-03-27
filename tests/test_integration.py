@@ -1,8 +1,8 @@
 import pytest
-from aegis.core.models import GuardrailPolicy
-from aegis.providers.stripe_mock import MockStripeProvider
-from aegis.client import AegisClient
-from aegis.tools.langchain import AegisPaymentTool
+from pop_pay.core.models import GuardrailPolicy
+from pop_pay.providers.stripe_mock import MockStripeProvider
+from pop_pay.client import AegisClient
+from pop_pay.tools.langchain import AegisPaymentTool
 
 @pytest.mark.asyncio
 async def test_integration_chain_success():
