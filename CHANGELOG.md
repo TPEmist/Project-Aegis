@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-03-31
+
+### Security
+- **HybridGuardrailEngine:** `POP_GUARDRAIL_ENGINE=llm` now runs Layer 1 keyword check first before invoking the LLM — obvious attacks are rejected instantly without spending API tokens
+- **LLM prompt isolation:** Agent `reasoning` is now wrapped in `<agent_reasoning>` XML tags to reduce prompt injection surface in LLM guardrail mode
+- **Domain cross-validation:** When `page_url` is provided, pop-pay validates the URL's domain against known vendor domains (AWS, GitHub, Cloudflare, OpenAI, Stripe, Anthropic, Wikipedia, and others) — mismatched domains are rejected to block phishing attacks
+- **Injection pattern detection:** Layer 1 now blocks JSON-like structures, role injection (`you are now`), instruction overrides (`ignore all previous`), and false pre-approval claims in agent reasoning
+
+### Added
+- **`page_url` parameter on `request_virtual_card`:** Optional URL for domain cross-validation; pass `page.url` from Playwright MCP
+- **`POP_EXTRA_BLOCK_KEYWORDS` env var:** Comma-separated list of custom keywords to extend the built-in Layer 1 blocklist
+- **`scripts/demo_cdp_injection.py`:** Terminal + browser demo script for recording the CDP injection flow as a GIF
+
+### Fixed
+- **Vendor matching bug:** Replaced substring matching (`"ai" in "mail"` → True) with token-based intersection; fixes false-positive vendor approvals
+- **LangChain card masking:** Added null check on `seal.card_number` before masking; handles pre-masked Stripe Issuing format (`****4242`) without crash
+- **Input validation:** Added `max_length` constraints to `PaymentIntent` (`target_vendor`: 200, `reasoning`: 2000) to prevent oversized LLM payloads
+
+### Docs
+- Updated `POP_GUARDRAIL_ENGINE` documentation to reflect hybrid two-layer behavior
+- Added `request_virtual_card` parameter table with `page_url` and domain validation notes
+- Added `POP_EXTRA_BLOCK_KEYWORDS` to `.env` reference section
+
 ## [0.5.7] - 2026-03-29
 
 ### Changed
