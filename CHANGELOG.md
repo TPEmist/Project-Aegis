@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **TOCTOU injection guard:** `inject_payment_info` now verifies the current page domain matches the guardrail-approved vendor before injecting credentials — blocks redirect-to-attacker attacks between approval and injection
 - **SQLite CVV removal:** `issued_seals` table no longer stores `card_number` or `cvv` columns. Only `masked_card` (e.g. `****-****-****-4242`) is persisted. An agent with file-read access to `pop_state.db` can no longer retrieve real card credentials via SQL.
 - **Vault encryption at rest:** New `vault.py` provides AES-256-GCM encrypted credential storage in `~/.config/pop-pay/vault.enc`. Key is machine-derived via scrypt; plaintext credentials never touch disk after `pop-init-vault` completes.
 - **Injector credential isolation:** `inject_payment_info()` now receives card credentials as parameters from the in-memory `VirtualSeal` object, not by fetching them from the database. `get_seal_details()` removed entirely.

@@ -181,6 +181,7 @@ class PopBrowserInjector:
         card_number: str = "",
         cvv: str = "",
         expiration_date: str = "",
+        approved_vendor: str = "",
     ) -> dict:
         """
         Connect to an existing Chromium browser via CDP, find payment fields
@@ -200,14 +201,37 @@ class PopBrowserInjector:
             card_number:      Card number to inject (passed from in-memory seal, never from DB).
             cvv:              CVV to inject (passed from in-memory seal, never from DB).
             expiration_date:  Expiration date in MM/YY format.
+            approved_vendor:  The guardrail-approved vendor name. When both page_url and
+                              approved_vendor are provided, the current page domain is verified
+                              to match the approved vendor before any injection occurs (TOCTOU guard).
 
         Returns a dict with:
             "card_filled"    — bool: card number field was found and filled.
             "billing_filled" — bool: at least one billing field was filled.
+            "blocked_reason" — str: non-empty if injection was blocked (e.g. "domain_mismatch:<domain>").
         For backwards compatibility, the dict is also truthy/falsy based on
         card_filled (via __bool__ semantics of the first value).
         """
-        result = {"card_filled": False, "billing_filled": False}
+        result = {"card_filled": False, "billing_filled": False, "blocked_reason": ""}
+
+        # TOCTOU guard: verify the current page domain matches the approved vendor
+        if page_url and approved_vendor:
+            from urllib.parse import urlparse
+            import re
+            actual_domain = urlparse(page_url).netloc.lower().removeprefix("www.")
+            # Check if approved_vendor tokens appear in the actual domain
+            # Use the same token-based matching as guardrails.py _tokenize()
+            vendor_tokens = set(re.split(r'[\s\-_./]+', approved_vendor.lower())) - {''}
+            domain_tokens = set(re.split(r'[\s\-_./]+', actual_domain)) - {''}
+            if not vendor_tokens.intersection(domain_tokens):
+                logger.warning(
+                    "PopBrowserInjector: TOCTOU domain mismatch — "
+                    "approved vendor '%s' does not match current page domain '%s'. "
+                    "Injection blocked.",
+                    approved_vendor, actual_domain,
+                )
+                result["blocked_reason"] = f"domain_mismatch:{actual_domain}"
+                return result
 
         try:
             from playwright.async_api import async_playwright

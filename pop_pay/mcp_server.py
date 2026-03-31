@@ -155,20 +155,30 @@ async def request_virtual_card(
             card_number=seal.card_number or _vault_creds.get("card_number", ""),
             cvv=seal.cvv or _vault_creds.get("cvv", ""),
             expiration_date=seal.expiration_date or _vault_creds.get("expiration_date", ""),
+            approved_vendor=intent.target_vendor,
         )
 
         # inject_payment_info now returns a dict; support both dict and legacy bool
         if isinstance(injection_result, dict):
             card_filled    = injection_result.get("card_filled", False)
             billing_filled = injection_result.get("billing_filled", False)
+            blocked_reason = injection_result.get("blocked_reason", "")
         else:
             # backwards-compatible fallback if a custom injector returns a bool
             card_filled    = bool(injection_result)
             billing_filled = False
+            blocked_reason = ""
 
         if not card_filled:
             # Undo the seal — cancel the budget reservation
             client.state_tracker.mark_used(seal.seal_id)
+            if blocked_reason.startswith("domain_mismatch:"):
+                actual = blocked_reason.split(":", 1)[1]
+                return (
+                    f"Payment blocked. Security: current page domain '{actual}' does not match "
+                    f"approved vendor '{intent.target_vendor}'. "
+                    f"Possible attack or navigation error — do not retry."
+                )
             return (
                 "Payment rejected. Error: Point One Percent could not find credit card input fields. "
                 "Most likely cause: you navigated via Playwright MCP but Point One Percent is looking "

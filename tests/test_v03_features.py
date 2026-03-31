@@ -127,7 +127,7 @@ async def test_injector_no_fields_returns_false():
             expiration_date="12/28",
         )
 
-    assert result == {"card_filled": False, "billing_filled": False}
+    assert result == {"card_filled": False, "billing_filled": False, "blocked_reason": ""}
     tracker.close()
 
 
