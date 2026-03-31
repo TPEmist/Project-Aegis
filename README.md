@@ -136,7 +136,7 @@ pip install "pop-pay[mcp,browser]"
 
 ### Step 1b: Configure Your `.env`
 
-Create `~/pop-pay/.env` — this is where `pop-pay` reads its configuration from:
+Create `~/.config/pop-pay/.env` — this is where `pop-pay` reads its configuration from:
 
 ```bash
 # ── Payment policy ──
@@ -163,7 +163,7 @@ POP_CDP_URL=http://localhost:9222
 # POP_BILLING_ZIP=10001
 ```
 
-> **`.env` location:** `pop-pay` searches for `.env` starting from the venv's parent directory upward. If your venv is at `~/pop-pay/.venv`, place `.env` at `~/pop-pay/.env`.
+> **`.env` location:** `pop-pay` reads from `~/.config/pop-pay/.env` first. This keeps your credentials outside the working directory and out of reach of agent file-read tools. If this path does not exist, it falls back to the standard dotenv cwd search — but `~/.config/pop-pay/.env` is strongly recommended for security.
 
 ### Step 2: Launch Chrome & Get MCP Commands
 
@@ -187,7 +187,7 @@ Choose your platform and follow the dedicated setup guide:
 
 ### Step 4: Configure Policy
 
-Edit `~/pop-pay/.env` (see Step 1b). Key variables:
+Edit `~/.config/pop-pay/.env` (see Step 1b). Key variables:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -334,7 +334,7 @@ Mock cards are fully functional within the system (budget tracking, burn-after-u
 
 For developers who want to use their **own physical credit card** with Point One Percent without a Stripe account. The `LocalVaultProvider` reads card credentials from environment variables and injects them into browser payment forms via CDP — the raw PAN is never exposed to the agent.
 
-**Add to your `~/pop-pay/.env`:**
+**Add to your `~/.config/pop-pay/.env`:**
 ```bash
 POP_BYOC_NUMBER=4111111111111111   # Your real card number
 POP_BYOC_CVV=123

@@ -1,10 +1,18 @@
 import os
 import json
 import asyncio
+from pathlib import Path
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-load_dotenv()
+# Load .env from the dedicated config dir first (preferred, keeps credentials out of the
+# project working directory and away from agent file-read tools).
+# Falls back to the standard dotenv cwd-search if no config file exists yet.
+_config_env = Path.home() / ".config" / "pop-pay" / ".env"
+if _config_env.exists():
+    load_dotenv(_config_env)
+else:
+    load_dotenv()
 from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 from pop_pay.providers.stripe_mock import MockStripeProvider
 from pop_pay.providers.byoc_local import LocalVaultProvider

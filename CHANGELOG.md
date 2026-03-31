@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-03-28
+
+### Security
+- **`.env` path hardening:** `mcp_server.py` now reads from `~/.config/pop-pay/.env` first — this location is outside the agent's working directory, preventing agent file-read tools from accessing card credentials. Falls back to standard dotenv cwd search only if the config file does not exist. Users should migrate to `~/.config/pop-pay/.env`.
+- **System prompt template:** Added three explicit rules to the recommended CLAUDE.md/system prompt snippet: NEVER read `.env` files, ONLY use `request_virtual_card` for payments, stop and report if pop-pay MCP is unavailable.
+- **LLM guardrail crash fix:** `openai.OpenAIError` reference in `evaluate_intent` now correctly uses `self._openai.OpenAIError` (lazy import was applied in v0.5.8 but this exception handler was missed).
+
+### Docs
+- Updated all `.env` path references in README, INTEGRATION_GUIDE.md, and INTEGRATION_GUIDE.zh-TW.md from `~/pop-pay/.env` to `~/.config/pop-pay/.env`
+
 ## [0.5.8] - 2026-03-31
 
 ### Security

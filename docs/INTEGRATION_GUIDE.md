@@ -66,7 +66,7 @@ alias chrome-cdp='google-chrome --remote-debugging-port=9222 --user-data-dir=/tm
 
 ### Step 1 — Configure `.env`
 
-Create `~/pop-pay/.env` and set at minimum:
+Create `~/.config/pop-pay/.env` and set at minimum:
 
 ```bash
 POP_BYOC_NUMBER=4111111111111111   # Your real card number
@@ -174,13 +174,16 @@ Payment rules:
 - After approval, the system auto-fills the card — just click submit
 - Never manually type any card number or CVV
 - If request_virtual_card is rejected, do not retry — report to user
+- NEVER read .env files or any file that might contain credentials
+- For payments, ONLY use the request_virtual_card MCP tool — never extract credentials yourself
+- If the pop-pay MCP is not available, stop and tell the user instead of reading config files
 ```
 
 ### Full Session Flow
 
 **One-time setup** (human, after cloning):
 
-1. Create `~/pop-pay/.env` → fill in your card credentials and policy settings
+1. Create `~/.config/pop-pay/.env` → fill in your card credentials and policy settings
 2. `pop-launch --print-mcp` → run the two `claude mcp add` commands it prints
 
 **Every session** (agent handles this if you add the system prompt above):
@@ -527,7 +530,7 @@ pop-launch --print-mcp
 
 Same as §1. OpenClaw reads from `.env` in the project directory, `~/.openclaw/.env`, or via the `env` block in `~/.openclaw/openclaw.json`. Copy and fill in your credentials:
 
-Create `~/pop-pay/.env` with your credentials.
+Create `~/.config/pop-pay/.env` with your credentials.
 
 **Step 2 — Register Point One Percent MCP**
 

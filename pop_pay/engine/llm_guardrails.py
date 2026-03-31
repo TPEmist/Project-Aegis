@@ -1,19 +1,29 @@
 import json
-import openai
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 from pop_pay.engine.guardrails import GuardrailEngine
 
+# openai is an optional dependency (pip install pop-pay[llm])
+# Imported lazily inside LLMGuardrailEngine to avoid ImportError when [llm] extra is not installed.
+
+
 class LLMGuardrailEngine:
     def __init__(self, api_key: str = None, base_url: str = None, model: str = 'gpt-4o-mini', use_json_mode: bool = True):
-        self.client = openai.AsyncOpenAI(api_key=api_key or 'not-needed', base_url=base_url)
+        try:
+            import openai as _openai
+        except ImportError:
+            raise ImportError(
+                "openai is required for LLM guardrail mode. "
+                "Install it with: pip install 'pop-pay[llm]'"
+            )
+        self.client = _openai.AsyncOpenAI(api_key=api_key or 'not-needed', base_url=base_url)
+        self._openai = _openai
         self.model = model
         self.use_json_mode = use_json_mode
 
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=10),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type((openai.RateLimitError, openai.APIConnectionError, openai.APITimeoutError))
     )
     async def evaluate_intent(self, intent: PaymentIntent, policy: GuardrailPolicy) -> tuple[bool, str]:
         prompt = f"""Evaluate the following agent payment intent and determine if it should be approved.
@@ -48,7 +58,7 @@ Respond ONLY with valid JSON: {{"approved": bool, "reason": str}}"""
 
             result = json.loads(result_text)
             return result.get("approved", False), result.get("reason", "Unknown")
-        except openai.OpenAIError as e:
+        except self._openai.OpenAIError as e:
             # Handle API authentication/connection errors without crashing the main loop
             return False, f"LLM Guardrail API Error: {str(e)}"
         except (json.JSONDecodeError, KeyError, Exception) as e:
