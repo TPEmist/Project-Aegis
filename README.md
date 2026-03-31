@@ -6,6 +6,8 @@
 
 # Point One Percent - Agent Pay
 
+[![glama badge](https://glama.ai/mcp/servers/TPEmist/Point-One-Percent/badges/score.svg)](https://glama.ai/mcp/servers/TPEmist/Point-One-Percent)
+
 > it only takes 0.1% of Hallucination to drain 100% of your wallet.
 
 Point One Percent is a payment guardrail and one-time flow protocol specifically designed for Agentic AI (e.g., OpenClaw, NemoClaw, Claude Code, OpenHands). It enables agents to handle financial transactions safely without risking unlimited exposure of human-controlled credit cards.
