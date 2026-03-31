@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cython build pipeline:** `_vault_core.pyx` Cython extension for compiled key derivation; PyPI wheels include compiled `.so` with CI-injected secret salt; source builds fall back to `_vault_core_fallback.py` with public salt
+- **GitHub Actions `build-wheels.yml`:** cibuildwheel workflow for multi-platform wheel builds (Linux x86_64/aarch64, macOS x86_64/arm64, Windows)
+- **`pop-pay init-vault --hardened`:** Runtime indicator showing whether compiled (PyPI) or OSS salt is in use
+
 ## [0.5.9] - 2026-03-28
 
 ### Security

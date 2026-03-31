@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "cython>=3.0", "setuptools"]
 build-backend = "hatchling.build"
 
 [project]
@@ -23,16 +23,28 @@ mcp = ["mcp>=1.26.0"]
 dashboard = ["streamlit>=1.55.0"]
 dev = ["pytest", "pytest-asyncio"]
 browser = ["playwright>=1.40.0"]
-all = ["pop-pay[llm,stripe,langchain,mcp,dashboard,browser]"]
+vault = ["cryptography"]
+all = ["pop-pay[llm,stripe,langchain,mcp,dashboard,browser,vault]"]
 
 [project.scripts]
 pop-launch = "pop_pay.cli:main"
+pop-init-vault = "pop_pay.cli_vault:cmd_init_vault"
 
 [tool.hatch.metadata.hooks.custom]
 path = "hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pop_pay"]
+
+[tool.hatch.build.hooks.custom]
+path = "build_ext.py"
+
+# [tool.cython] — Cython build process notes:
+# - pop_pay/engine/_vault_core.pyx is compiled via setup_cython.py (invoked by build_ext.py)
+# - The POP_VAULT_COMPILED_SALT env var (GitHub Actions secret) is injected into _vault_core.pyx
+#   before compilation, then restored. This keeps the secret out of the repo.
+# - Source/OSS builds compile with _COMPILED_SALT = None and fall back to the public salt.
+# - cibuildwheel (build-wheels.yml) builds platform wheels for Linux, macOS, and Windows.
 
 [dependency-groups]
 dev = [
