@@ -43,14 +43,20 @@ We use `uv` for lightning-fast Python package management.
 
 ### Setup
 1. Clone the repository.
-2. Copy the provided environment variable reference and configure your local settings:
-   ```bash
-   cp .env.example .env
-   # Edit .env and fill in any credentials you need (BYOC card, Stripe key, etc.)
-   ```
-3. Run `uv sync` to create a virtual environment and install all dependencies (including dev tools).
+2. Install dependencies:
    ```bash
    uv sync
+   ```
+3. Initialize the credential vault (card credentials are encrypted at rest — no plaintext `.env` required):
+   ```bash
+   pop-init-vault
+   ```
+   This will prompt for your card credentials and encrypt them to `~/.config/pop-pay/vault.enc`.
+4. Copy the policy template and configure your local settings:
+   ```bash
+   cp .env.example ~/.config/pop-pay/.env
+   # Edit ~/.config/pop-pay/.env — set allowed vendors, spending limits, CDP URL, etc.
+   # Do NOT add card credentials here; they live in the vault.
    ```
 
 ### Running Tests
