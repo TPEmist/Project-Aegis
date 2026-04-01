@@ -3,7 +3,11 @@ import argparse
 import getpass
 import sys
 from pathlib import Path
-from pop_pay.vault import save_vault, vault_exists, secure_wipe_env, VAULT_DIR, VAULT_PATH, OSS_WARNING
+from pop_pay.vault import (
+    save_vault, vault_exists, secure_wipe_env,
+    VAULT_DIR, VAULT_PATH, OSS_WARNING,
+    _read_vault_mode,
+)
 
 
 def cmd_init_vault():
@@ -21,6 +25,29 @@ def cmd_init_vault():
     print(OSS_WARNING)
 
     if vault_exists():
+        # Downgrade guard: refuse to overwrite a hardened vault from an OSS build
+        vault_mode = _read_vault_mode()
+        if vault_mode == "hardened":
+            try:
+                from pop_pay.engine import _vault_core
+                is_hardened = _vault_core.is_hardened()
+            except Exception:
+                is_hardened = False
+            if not is_hardened:
+                print(
+                    "\n\033[1;31mERROR: Existing vault was created with a hardened PyPI build,\n"
+                    "but the Cython extension is missing or not hardened.\n"
+                    "Re-initializing now would DOWNGRADE encryption to the public OSS salt.\n\n"
+                    "To proceed safely:\n"
+                    "  1. Reinstall via PyPI: pip install pop-pay\n"
+                    "  2. Then re-run: pop-init-vault\n\n"
+                    "If you intentionally switched to OSS, manually delete:\n"
+                    f"  {VAULT_PATH}\n"
+                    f"  {VAULT_DIR / '.vault_mode'}\n"
+                    "Then re-run pop-init-vault.\033[0m\n"
+                )
+                sys.exit(1)
+
         overwrite = input("A vault already exists. Overwrite? [y/N]: ").strip().lower()
         if overwrite != "y":
             print("Aborted.")

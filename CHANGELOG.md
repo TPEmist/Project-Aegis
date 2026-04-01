@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-03-31
+
+### Security
+- **Vault-embedded mode marker:** `.vault_mode` file records whether vault was created with a hardened PyPI build or OSS public salt. `load_vault()` and `pop-init-vault` both check this marker — if vault is marked `hardened` but the Cython `.so` is missing, the system refuses to decrypt or overwrite rather than silently falling back to the weaker OSS salt.
+- **Downgrade attack hardening in `pop-init-vault`:** Replaces the bypassable `POP_STRICT_MODE` env-var check with the tamper-evident `.vault_mode` marker. An agent with shell access cannot bypass protection by unsetting an environment variable — the marker file itself must be manually deleted (an observable action) to override.
+- **Removed `POP_STRICT_MODE`:** Env-var-based strict mode was bypassable via `unset POP_STRICT_MODE`. Protection is now structural, not configuration-dependent.
+
 ## [0.6.3] - 2026-03-31
 
 ### Security

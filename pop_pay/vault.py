@@ -32,6 +32,8 @@ VAULT_PATH = VAULT_DIR / "vault.enc"
 KEYRING_SERVICE = "pop-pay-vault"
 KEYRING_USERNAME = "derived-key-hex"
 
+VAULT_MODE_PATH = VAULT_DIR / ".vault_mode"
+
 # OSS public salt — intentionally documented as a security limitation.
 # PyPI/Cython builds will replace this with a compiled-in secret.
 _OSS_SALT = b"pop-pay-oss-v1-public-salt-2026"
@@ -221,15 +223,50 @@ def vault_exists() -> bool:
     return VAULT_PATH.exists()
 
 
+def _write_vault_mode():
+    """Write .vault_mode marker (hardened/oss). Read by pop-init-vault and load_vault."""
+    try:
+        from pop_pay.engine import _vault_core
+        mode = "hardened" if _vault_core.is_hardened() else "oss"
+    except Exception:
+        mode = "oss"
+    VAULT_MODE_PATH.write_text(mode)
+    VAULT_MODE_PATH.chmod(0o600)
+
+
+def _read_vault_mode() -> str:
+    """Return 'hardened', 'oss', or 'unknown' if marker missing."""
+    if VAULT_MODE_PATH.exists():
+        return VAULT_MODE_PATH.read_text().strip()
+    return "unknown"
+
+
 def load_vault() -> dict:
     """Load and decrypt vault. Tries passphrase key from keyring first, then machine key.
 
-    If POP_STRICT_MODE=1 is set, refuses to fall back to the public OSS salt.
-    This prevents downgrade attacks where an attacker deletes the Cython .so
-    to force re-initialization with the weaker OSS key.
+    Downgrade attack protection: if .vault_mode marker says 'hardened' but the
+    Cython hardened build is not available, refuses to attempt OSS salt decryption.
+    This prevents an attacker from deleting the .so to force re-initialization
+    with the weaker public salt.
     """
-    import os
-    strict_mode = os.environ.get("POP_STRICT_MODE", "").strip() == "1"
+    # Downgrade check: vault marker says hardened but .so is gone
+    vault_mode = _read_vault_mode()
+    if vault_mode == "hardened":
+        try:
+            from pop_pay.engine import _vault_core
+            if not _vault_core.is_hardened():
+                raise RuntimeError(
+                    "Vault was created with a hardened PyPI build, but the "
+                    "Cython extension is missing or not hardened.\n"
+                    "Reinstall via PyPI: pip install pop-pay\n"
+                    "If you intentionally switched to OSS, delete ~/.config/pop-pay/vault.enc "
+                    "and run pop-init-vault again."
+                )
+        except ImportError:
+            raise RuntimeError(
+                "Vault requires hardened build but _vault_core module not found. "
+                "Reinstall via PyPI: pip install pop-pay"
+            )
 
     blob = VAULT_PATH.read_bytes()
     # Try passphrase-derived key from keyring first (strongest protection)
@@ -238,24 +275,7 @@ def load_vault() -> dict:
         try:
             return decrypt_credentials(blob, key_override=passphrase_key)
         except ValueError:
-            pass  # Wrong key — fall through
-
-    # Check strict mode before attempting machine-derived key
-    if strict_mode:
-        try:
-            from pop_pay.engine import _vault_core
-            if not _vault_core.is_hardened():
-                raise RuntimeError(
-                    "POP_STRICT_MODE=1: Cython hardened build not available. "
-                    "Refusing to decrypt with public OSS salt. "
-                    "Reinstall via PyPI or disable strict mode."
-                )
-        except ImportError:
-            raise RuntimeError(
-                "POP_STRICT_MODE=1: _vault_core module not found. "
-                "Refusing to decrypt with public OSS salt."
-            )
-
+            pass  # Wrong key — fall through to machine-derived key
     return decrypt_credentials(blob)
 
 
@@ -280,6 +300,8 @@ def save_vault(creds: dict, key_override: bytes = None):
             decrypt_credentials(VAULT_PATH.read_bytes())
     except ValueError as e:
         raise RuntimeError(f"Vault write verification failed: {e}")
+    # Write mode marker so load_vault and pop-init-vault can detect downgrade attacks
+    _write_vault_mode()
 
 
 def secure_wipe_env(env_path: Path):
