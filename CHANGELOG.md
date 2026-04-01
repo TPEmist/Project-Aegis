@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-03-31
+
+### Security
+- **XOR obfuscation:** Compiled salt now stored as two XOR-paired integer lists in the `.so` binary. Neither list alone reveals the salt; reconstruction happens only inside `derive_key()` at runtime. Defeats `strings` static binary scanning.
+
 ## [0.6.1] - 2026-03-31
 
 ### Security
