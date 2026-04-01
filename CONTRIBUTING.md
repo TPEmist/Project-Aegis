@@ -96,4 +96,20 @@ The `PopBrowserInjector` handles most common checkout forms and cross-origin Str
 - Dynamic form detection (forms that render after JS load with non-standard field naming)
 - Automated test fixtures covering more real-world checkout page structures
 
+### 6. Security: Opaque Agent Responses
+
+**Current behavior:** When a payment or billing request is rejected, the MCP tool returns a detailed rejection reason to the agent (e.g. `"Vendor 'X' is not in your allowed categories"`, `"domain_mismatch:attacker.com"`).
+
+**Problem:** Detailed rejection reasons help adversarial agents refine their attacks. An agent that learns *why* it was blocked can adjust its vendor name, reasoning, or navigation to bypass the guardrail on the next attempt. This is analogous to verbose error messages in web authentication enabling user enumeration.
+
+**Desired behavior:**
+- **Agent-facing (MCP response):** Always return a single opaque message: `"Payment request blocked by security policy."` — no details about which rule triggered or why.
+- **Human-facing (Dashboard / `pop_state.db`):** Full rejection reason, vendor, amount, reasoning, and guardrail layer stored and visible to the operator.
+
+**Implementation notes:**
+- `mcp_server.py` `request_virtual_card` and `request_purchaser_info` should catch all rejection/block paths and return the opaque string before returning to the agent.
+- `pop_state.db` audit log already stores structured data — the detailed reason should continue to be written there.
+- A new `rejection_detail` column (or existing `rejection_reason`) in `issued_seals` / audit log should surface in the Dashboard's transaction table.
+- Edge case: injection failures that require agent action (e.g. "card fields not found — pass page_url") are UX errors, not security rejections, and may still return actionable messages to the agent.
+
 If you have an idea for a feature or a bug fix, please open an issue or submit a Pull Request!
