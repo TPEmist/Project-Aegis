@@ -104,7 +104,13 @@ def cmd_init_vault():
                 "POP_AUTO_INJECT=true\n"
                 "POP_CDP_URL=http://localhost:9222\n\n"
                 "# Guardrail engine: keyword (default, zero-cost) or llm\n"
-                "# POP_GUARDRAIL_ENGINE=keyword\n"
+                "# POP_GUARDRAIL_ENGINE=keyword\n\n"
+                "# Billing info for auto-filling name/address fields on checkout pages\n"
+                "# POP_BILLING_FIRST_NAME=Jane\n"
+                "# POP_BILLING_LAST_NAME=Doe\n"
+                "# POP_BILLING_EMAIL=jane@example.com\n"
+                "# POP_BILLING_STREET=123 Main St\n"
+                "# POP_BILLING_ZIP=10001\n"
             )
             policy_env_path.chmod(0o600)
             print(f"Template created at {policy_env_path} — edit to set your policy.")
