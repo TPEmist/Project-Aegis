@@ -3,7 +3,8 @@
 
 _COMPILED_SALT = None
 
-def get_compiled_salt():
+def derive_key(machine_id: bytes, username: bytes):
+    """OSS fallback: no compiled salt, returns None to trigger public salt path."""
     return None
 
 def is_hardened():

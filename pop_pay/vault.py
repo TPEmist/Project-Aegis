@@ -104,20 +104,34 @@ def _get_username() -> bytes:
 
 
 def _derive_key(salt: bytes = None, key_override: bytes = None) -> bytes:
-    """Derive AES-256 key. If key_override is provided, use it directly."""
+    """Derive AES-256 key. If key_override is provided, use it directly.
+
+    For PyPI/Cython builds: delegates to _vault_core.derive_key() so the
+    compiled salt never crosses the Python boundary. Falls back to OSS public
+    salt if the Cython module is unavailable or not hardened.
+    """
     if key_override is not None:
         return key_override
     import hashlib
-    if salt is None:
-        salt = _OSS_SALT
     machine_id = _get_machine_id()
     try:
         username = _get_username()
     except Exception:
         username = b"unknown"
+
+    # Try Cython hardened path first (salt stays inside .so, never exposed)
+    if salt is None:
+        try:
+            from pop_pay.engine import _vault_core
+            key = _vault_core.derive_key(machine_id, username)
+            if key is not None:
+                return key
+        except Exception:
+            pass
+        salt = _OSS_SALT
+
     password = machine_id + b":" + username
     # n=2**14 (16MB) — well within OpenSSL default maxmem (32MB).
-    # Higher n is bounded by machine_id:username entropy (~40-50 bits), not KDF cost.
     return hashlib.scrypt(password, salt=salt, n=2**14, r=8, p=1, dklen=32)
 
 
