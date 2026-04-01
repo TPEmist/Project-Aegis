@@ -25,7 +25,9 @@ README.pypi.md
 local_tests/
 v0.4.1_DEV_PLAN.md
 scripts/demo_guardrail.py
+scripts/demo_cdp_injection.py
 .playwright-mcp/
+CLAUDE.md
 
 # Cython build artifacts
 *.so
