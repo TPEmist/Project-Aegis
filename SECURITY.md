@@ -20,7 +20,7 @@ If the agent has **arbitrary shell execution** and runs as the same OS user as t
 |---|---|---|---|
 | `.env` file (pre-v0.6.0) | ❌ Exposed | ❌ Exposed | ❌ |
 | Vault, OSS source, no passphrase | ✅ Blocked | ❌ Can call `derive_key()` | ✅ Blocked |
-| Vault, PyPI/Cython, no passphrase | ✅ Blocked | ⚠️ Must reverse `.so` first | ✅ Blocked |
+| Vault, PyPI/Cython, no passphrase (v0.6.1+) | ✅ Blocked | ⚠️ Must reverse `.so` first (salt not exposed as Python object) | ✅ Blocked |
 | Vault + passphrase (any install) | ✅ Blocked | ✅ Blocked (needs passphrase) | ✅ Blocked (strong passphrase) |
 | **Stripe Issuing (commercial)** | ✅ Blocked | ✅ No credentials stored | ✅ |
 
