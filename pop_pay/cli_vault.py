@@ -72,16 +72,18 @@ def cmd_init_vault():
     policy_env_path = VAULT_DIR / ".env"
     env_candidates = [policy_env_path, Path.cwd() / ".env"]
 
-    # Offer to wipe any existing .env (user knows if it has credentials)
+    # Offer to wipe any .env that contains old-format card credentials
     wiped_policy_env = False
     for env_path in env_candidates:
         if env_path.exists():
-            wipe = input(f"\nFound {env_path}. Does it contain card credentials to securely wipe? [y/N]: ").strip().lower()
-            if wipe == "y":
-                secure_wipe_env(env_path)
-                print(f"{env_path} wiped.")
-                if env_path == policy_env_path:
-                    wiped_policy_env = True
+            content = env_path.read_text()
+            if any(k in content for k in ("POP_BYOC_NUMBER", "POP_BYOC_CVV")):
+                wipe = input(f"\n{env_path} contains card credentials. Securely wipe it? [y/N]: ").strip().lower()
+                if wipe == "y":
+                    secure_wipe_env(env_path)
+                    print(f"{env_path} wiped.")
+                    if env_path == policy_env_path:
+                        wiped_policy_env = True
 
     # If no policy .env exists (or was just wiped), offer to create a template
     if not policy_env_path.exists() or wiped_policy_env:
