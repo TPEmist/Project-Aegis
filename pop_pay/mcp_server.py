@@ -255,7 +255,10 @@ async def request_purchaser_info(
     vendor_allowed = (
         vendor_lower in allowed_lower                          # exact: "aws" == "aws"
         or any(tok in allowed_lower for tok in vendor_tokens) # token: "aws" in ["aws",...]
-        or any(cat in vendor_lower for cat in allowed_lower)  # substring: "maker faire" in "maker faire bay area 2026"
+        or any(                                                # token-subset: all words of "maker faire"
+            set(re.split(r'[\s\-_./]+', cat)) - {''} <= vendor_tokens  # appear in vendor tokens
+            for cat in allowed_lower
+        )
     )
     if not vendor_allowed:
         return (
