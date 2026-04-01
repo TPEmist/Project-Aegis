@@ -119,17 +119,22 @@ async def request_virtual_card(
 ) -> str:
     """Request a one-time virtual credit card for an automated purchase.
 
+    This tool reads card credentials and billing info from the user's pre-configured
+    secure vault and local config. You do NOT need to ask the user for any card number,
+    CVV, name, email, phone, or address — just call this tool when card fields are visible.
+
     IMPORTANT USAGE RULES:
-    - ONLY call this tool when you are currently on the FINAL checkout page
-      and can visually see the credit card input fields in the browser.
+    - ONLY call this tool when you are currently on the checkout/payment page
+      and can visually see credit card input fields in the browser.
+    - If you are on a billing/contact info page (name, email, phone, address) but
+      card fields are NOT visible yet, use request_purchaser_info instead.
     - DO NOT call this if you have not yet navigated to the checkout form.
     - DO NOT retry with a different reasoning if this tool returns a rejection.
-    - If auto-injection is enabled (POP_AUTO_INJECT=true), the card will be
-      securely filled into the browser form automatically after approval —
-      you only need to click the submit/pay button.
-    - page_url: Pass the current checkout page URL (e.g. from browser_navigate
-      result). Required when using Playwright MCP for navigation — Point One Percent uses
-      this to sync the page into its CDP browser for injection.
+    - Card credentials and billing info are auto-injected into the form —
+      you only need to click the submit/pay button after approval.
+    - page_url: Pass the current checkout page URL (e.g. from browser_navigate result).
+      Required when using Playwright MCP — Point One Percent uses this to sync the page
+      into its CDP browser for injection.
     """
     intent = PaymentIntent(
         agent_id="mcp-agent",
@@ -217,18 +222,23 @@ async def request_purchaser_info(
     page_url: str = "",
     reasoning: str = "",
 ) -> str:
-    """Fill in purchaser/billing info (name, email, phone, address) on the current page.
+    """Auto-fill purchaser/billing info (name, email, phone, address) from the user's pre-configured profile.
 
-    WHEN TO USE THIS TOOL:
-    - Call this when you are on a billing/contact info page and can see fields
-      for name, email, phone, or address — but NO credit card fields yet.
-    - Do NOT call this if card input fields are already visible on the page;
-      use request_virtual_card instead (it fills billing fields too, in one step).
-    - After this tool completes, proceed to the next page and call
-      request_virtual_card when the payment form is visible.
+    IMPORTANT: This tool reads the user's billing info from their local config and injects
+    it directly into the browser form via CDP. You do NOT need to ask the user for their
+    name, email, phone, or address — just call this tool and it handles everything automatically.
 
-    This tool does NOT issue a card, does NOT charge anything, and does NOT
-    count against your spending budget. It only fills contact/billing fields.
+    WHEN TO USE:
+    - You are on a purchaser/billing/contact info page with fields for name, email,
+      phone, or address — but NO credit card input fields are visible yet.
+    - Call this immediately without asking the user for any personal information.
+    - After this completes, navigate to the payment page and call request_virtual_card
+      when card fields are visible.
+
+    DO NOT use if card input fields are already visible — use request_virtual_card instead
+    (it fills both card credentials and billing info in one step).
+
+    This tool does NOT issue a card, does NOT charge anything, and does NOT affect your budget.
     """
     if injector is None:
         return (
