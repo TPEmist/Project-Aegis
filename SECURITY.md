@@ -21,7 +21,7 @@ If the agent has **arbitrary shell execution** and runs as the same OS user as t
 |---|---|---|---|---|
 | `.env` file (pre-v0.6.0) | ❌ Exposed | ❌ Exposed | N/A | ❌ |
 | Vault, OSS source, no passphrase | ✅ Blocked | ❌ Can call `derive_key()` with public salt | N/A | ✅ Blocked |
-| Vault, PyPI/Cython, no passphrase (v0.6.1+) | ✅ Blocked | ⚠️ Must reverse `.so` first (salt never exposed as Python object) | ✅ Blocked (v0.6.4+) | ✅ Blocked |
+| Vault, PyPI/Cython, no passphrase (v0.6.1+) | ✅ Blocked | ✅ Blocked (`derive_key` not Python-accessible; Cython `cdef` not exposed as module attribute) | ✅ Blocked (v0.6.4+) | ✅ Blocked |
 | Vault + passphrase (any install) | ✅ Blocked | ✅ Blocked (needs passphrase) | ✅ Blocked | ✅ Blocked (strong passphrase) |
 | **Stripe Issuing (commercial)** | ✅ Blocked | ✅ No credentials stored | ✅ | ✅ |
 
