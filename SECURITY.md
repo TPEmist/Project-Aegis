@@ -120,6 +120,18 @@ Card credentials are encrypted with AES-256-GCM. The encryption key is derived v
 
 ---
 
+### v0.6.5 / Full PyPI Wheel Validation (2026-04-01)
+
+| Attack | Result | Notes |
+|---|---|---|
+| A1: Call `derive_key()` from Python | ✅ BLOCKED | Cython did not expose `derive_key` as a Python-accessible module attribute — stronger than expected |
+| A2: Call `get_compiled_salt()` | ⚠️ Returned `None` (stub survived) | No sensitive data exposed; stub removed in v0.6.5 |
+| A3: Read `_A1` / `_B2` XOR constants | ✅ BLOCKED | Internal constants not accessible from Python layer |
+| A4: Downgrade attack (delete `.so`) | ✅ BLOCKED | `load_vault()` raises `RuntimeError`; refuses to decrypt |
+| A5: Tamper `.vault_mode` marker (`hardened` → `oss`) | ✅ BLOCKED | Vault encrypted with hardened key path; decryption fails with wrong key |
+
+---
+
 ### ⚠️ Partial / Documented Limitations
 
 | Attack | Status | Notes |
