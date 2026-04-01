@@ -141,6 +141,50 @@ POP_MAX_DAILY=500.0
 
 ---
 
+## Third-Party Payment Processors
+
+Many vendors outsource their checkout to a third-party payment processor.
+When this happens, the final payment page domain will not match the vendor's own domain —
+which would normally trigger a TOCTOU block.
+
+pop-pay ships with a built-in allowlist of known-safe processors. If a checkout page
+redirects to any of these domains, the domain guard passes automatically (the vendor
+intent was already verified by the policy gate):
+
+| Processor | Domain | Used by |
+|---|---|---|
+| Stripe | `stripe.com` | Countless SaaS, e-commerce |
+| Stripe Elements | `js.stripe.com` | Embedded card forms |
+| Zoho Payments | `zohosecurepay.com` | Maker Faire, Zoho Commerce merchants |
+| Square | `squareup.com`, `square.com` | Retail, events |
+| PayPal | `paypal.com` | General |
+| Braintree | `braintreegateway.com` | PayPal subsidiary |
+| Adyen | `adyen.com` | Enterprise e-commerce |
+| Checkout.com | `checkout.com` | Enterprise |
+| Paddle | `paddle.com` | SaaS subscriptions |
+| FastSpring | `fastspring.com` | Software / digital goods |
+| Gumroad | `gumroad.com` | Creators, digital products |
+| Recurly | `recurly.com` | Subscription billing |
+| Chargebee | `chargebee.com` | Subscription billing |
+| Eventbrite | `eventbrite.com` | Events & ticketing |
+| Tito | `ti.to` | Tech conferences (RailsConf, etc.) |
+| Luma | `lu.ma` | Tech meetups & events |
+| Universe | `universe.com` | Ticketing |
+| 2Checkout | `2checkout.com` | Software & digital |
+| Authorize.net | `authorize.net` | Hosted payment forms |
+
+If your vendor uses a processor not on this list, add it to your `.env`:
+
+```env
+POP_ALLOWED_PAYMENT_PROCESSORS=["checkout.mybank.com", "pay.myprocessor.io"]
+```
+
+> **Want to add a processor to the built-in list?**
+> Open a PR at `github.com/agentpayorg/project-aegis` — include the processor name,
+> domain, and one or two example vendors that use it.
+
+---
+
 ## Known Limitations
 
 **Semantic categories are not supported without LLM guardrails.**

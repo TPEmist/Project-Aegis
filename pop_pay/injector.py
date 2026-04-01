@@ -272,6 +272,25 @@ class PopBrowserInjector:
                     )
                 )
 
+            # Payment processor passthrough: vendor intent was already approved by the
+            # policy gate. If checkout redirected to a known third-party processor
+            # (e.g. zohosecurepay.com for Maker Faire), allow it.
+            if not domain_ok:
+                import json as _json
+                from pop_pay.engine.guardrails import KNOWN_PAYMENT_PROCESSORS
+                _user_processors = set(_json.loads(
+                    os.getenv("POP_ALLOWED_PAYMENT_PROCESSORS", "[]")
+                ))
+                _all_processors = KNOWN_PAYMENT_PROCESSORS | _user_processors
+                if any(actual_domain == p or actual_domain.endswith("." + p)
+                       for p in _all_processors):
+                    domain_ok = True
+                    logger.info(
+                        "PopBrowserInjector: domain '%s' is a known payment processor "
+                        "— TOCTOU passed for vendor '%s'.",
+                        actual_domain, approved_vendor,
+                    )
+
             if not domain_ok:
                 logger.warning(
                     "PopBrowserInjector: TOCTOU domain mismatch — "
@@ -611,6 +630,22 @@ class PopBrowserInjector:
                         if len(tok) >= 4
                     )
                 )
+
+            if not domain_ok:
+                import json as _json
+                from pop_pay.engine.guardrails import KNOWN_PAYMENT_PROCESSORS
+                _user_processors = set(_json.loads(
+                    os.getenv("POP_ALLOWED_PAYMENT_PROCESSORS", "[]")
+                ))
+                _all_processors = KNOWN_PAYMENT_PROCESSORS | _user_processors
+                if any(actual_domain == p or actual_domain.endswith("." + p)
+                       for p in _all_processors):
+                    domain_ok = True
+                    logger.info(
+                        "PopBrowserInjector: domain '%s' is a known payment processor "
+                        "— TOCTOU passed for vendor '%s'.",
+                        actual_domain, approved_vendor,
+                    )
 
             if not domain_ok:
                 logger.warning(

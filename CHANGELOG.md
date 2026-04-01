@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.10] - 2026-04-01
+
+### Added
+- **`KNOWN_PAYMENT_PROCESSORS` built-in allowlist** (`guardrails.py`): 19 known third-party payment processors (Stripe, Zoho, Square, PayPal, Braintree, Adyen, Checkout.com, Paddle, FastSpring, Gumroad, Recurly, Chargebee, Eventbrite, Tito, Luma, Universe, 2Checkout, Authorize.net). When a checkout page redirects to any of these domains, the TOCTOU domain guard passes automatically — vendor intent was already verified by the policy gate.
+- **`POP_ALLOWED_PAYMENT_PROCESSORS` env var**: User-extensible JSON array for processors not in the built-in list. Merged with `KNOWN_PAYMENT_PROCESSORS` at injection time.
+- **`docs/CATEGORIES_COOKBOOK.md` — Payment Processors section**: Full table of built-in processors with domains and example vendors; instructions for extending the list via env var and contributing new entries.
+
+### Changed
+- `injector.py`: Both `inject_payment_info` and `inject_billing_only` TOCTOU checks now include a processor passthrough step after vendor domain matching fails.
+- `.env.example`: Added `POP_ALLOWED_PAYMENT_PROCESSORS` (commented out) with explanation.
+
 ## [0.6.9] - 2026-04-01
 
 ### Added
