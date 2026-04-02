@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.13] - 2026-04-01
+
+### Added
+- **Phone country code dropdown support:** `PHONE_COUNTRY_CODE_SELECTORS` (13 selectors covering `select[name='dialCode']`, `select[name='countryCode']`, etc.). `POP_BILLING_PHONE_COUNTRY_CODE` fills the country code select; `POP_BILLING_PHONE_NATIONAL` fills the number-only input on split forms. When no country code dropdown is found, full E.164 is used as before — zero config change needed for existing users.
+
 ## [0.6.12] - 2026-04-01
 
 ### Added

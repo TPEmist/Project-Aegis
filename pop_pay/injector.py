@@ -169,6 +169,24 @@ PHONE_SELECTORS = [
     "input[aria-label*='phone']",
 ]
 
+# Separate country-code dropdown that appears before the phone number input.
+# Matched fuzzily: "US", "+1", "United States" all resolve via _select_option().
+PHONE_COUNTRY_CODE_SELECTORS = [
+    "select[autocomplete='tel-country-code']",
+    "select[name='phone_country_code']",
+    "select[name='phoneCountryCode']",
+    "select[name='dialCode']",
+    "select[name='dial_code']",
+    "select[name='country_code']",
+    "select[name='countryCode']",
+    "select[id*='country_code']",
+    "select[id*='dialCode']",
+    "select[id*='dial_code']",
+    "select[aria-label*='Country code']",
+    "select[aria-label*='country code']",
+    "select[aria-label*='Dial code']",
+]
+
 # Dropdown-capable selectors: include both <select> and <input> variants.
 # _fill_field() detects the tag at runtime and uses select_option() or fill()
 # accordingly — no separate logic needed when adding new dropdown fields.
@@ -632,7 +650,21 @@ class PopBrowserInjector:
         if await self._fill_field(f, COUNTRY_SELECTORS, country,  "country"):   any_filled = True
         if await self._fill_field(f, ZIP_SELECTORS,     zip_code, "zip"):       any_filled = True
         if await self._fill_field(f, EMAIL_SELECTORS,   email,    "email"):     any_filled = True
-        if await self._fill_field(f, PHONE_SELECTORS,   phone,    "phone"):     any_filled = True
+
+        # Phone: fill country code dropdown first (if present), then number field.
+        # If a country code dropdown was found and POP_BILLING_PHONE_NATIONAL is set,
+        # fill the number field with the national number only (no country prefix).
+        # Otherwise fall back to the full E.164 number for combined inputs.
+        phone_country_code = billing_info.get("phone_country_code", "")
+        phone_national     = billing_info.get("phone_national", "")
+        cc_filled = False
+        if phone_country_code:
+            cc_filled = await self._fill_field(
+                f, PHONE_COUNTRY_CODE_SELECTORS, phone_country_code, "phone country code"
+            )
+        phone_value = phone_national if (cc_filled and phone_national) else phone
+        if await self._fill_field(f, PHONE_SELECTORS, phone_value, "phone"):
+            any_filled = True
 
         return any_filled
 
