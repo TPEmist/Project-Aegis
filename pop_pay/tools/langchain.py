@@ -10,6 +10,7 @@ class PopPaymentInput(BaseModel):
     requested_amount: float = Field(..., description="The amount of money to request.")
     target_vendor: str = Field(..., description="The vendor to pay.")
     reasoning: str = Field(..., description="Reasoning for this payment.")
+    page_url: str = Field(default="", description="Current checkout page URL. Pass this when using Playwright MCP to enable TOCTOU domain validation.")
 
 
 class PopPaymentTool(BaseTool):
@@ -51,6 +52,7 @@ class PopPaymentTool(BaseTool):
         requested_amount: float,
         target_vendor: str,
         reasoning: str,
+        page_url: str = "",
         run_manager=None,
     ) -> str:
         return "Please use the async method ainvoke() for PopPaymentTool."
@@ -60,6 +62,7 @@ class PopPaymentTool(BaseTool):
         requested_amount: float,
         target_vendor: str,
         reasoning: str,
+        page_url: str = "",
         run_manager=None,
     ) -> str:
         intent = PaymentIntent(
@@ -92,10 +95,10 @@ class PopPaymentTool(BaseTool):
                 card_number=seal.card_number or "",
                 cvv=seal.cvv or "",
                 expiration_date=seal.expiration_date or "",
+                page_url=page_url,
+                approved_vendor=target_vendor,
             )
 
-            # inject_payment_info returns a dict; a non-empty dict is always truthy
-            # so we must inspect card_filled explicitly rather than using bool(result)
             if isinstance(injection_result, dict):
                 card_filled = injection_result.get("card_filled", False)
             else:

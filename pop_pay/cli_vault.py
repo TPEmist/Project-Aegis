@@ -139,6 +139,10 @@ def cmd_init_vault():
                 "# POP_BILLING_PHONE=+14155551234\n"
                 "# POP_BILLING_STREET=123 Main St\n"
                 "# POP_BILLING_ZIP=10001\n"
+                "# POP_BILLING_CITY=New York\n"
+                "# POP_BILLING_STATE=NY\n"
+                "# POP_BILLING_COUNTRY=US\n"
+                "# POP_BILLING_PHONE_COUNTRY_CODE=+1\n"
             )
             policy_env_path.chmod(0o600)
             print(f"Template created at {policy_env_path} — edit to set your policy.")

@@ -449,18 +449,22 @@ async def browser_agent_with_pop():
 
     # 3. Trusted local process fills the real credentials into the browser
     #    (This code runs in the local execution env, NOT inside the LLM context)
-    #    In production use PopBrowserInjector (CDP-based) instead of Playwright directly.
-    #    Card details are available on the seal object returned by process_payment():
-    #      seal.card_number, seal.cvv, seal.expiration_date
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
         await page.goto("https://donate.wikimedia.org/")
 
-        # Card details come from the seal — never from LLM output
-        await page.fill("#card_number", seal.card_number)
-        await page.fill("#cvv", seal.cvv)
-        await page.fill("#expiry", seal.expiration_date)
+        # CRITICAL: Use PopBrowserInjector — real card details are injected from
+        # the in-memory VirtualSeal, never retrieved from the DB (which only stores masked numbers).
+        from pop_pay.injector import PopBrowserInjector
+        browser_injector = PopBrowserInjector(client.state_tracker)
+        await browser_injector.inject_payment_info(
+            seal_id=seal.seal_id,
+            cdp_url="http://localhost:9222",
+            card_number=seal.card_number or "",
+            cvv=seal.cvv or "",
+            expiration_date=seal.expiration_date or "",
+        )
         await page.click("#submit-donation")
 
     # 4. Mark seal as used (burn-after-use)

@@ -254,28 +254,10 @@ async def request_purchaser_info(
 
     # Lightweight vendor check: is this vendor in the allowed list?
     # Three-way match: exact | token-in-allowed | allowed-substring-of-vendor
-    import re
-    vendor_lower = target_vendor.lower()
-    vendor_tokens = set(re.split(r'[\s\-_./]+', vendor_lower)) - {''}
-    allowed_lower = [c.lower() for c in allowed_categories]
-    # Also check page_url domain tokens against allowed categories
-    # Handles the case where agent passes a domain as target_vendor (e.g. "bayarea.makerfaire.com")
     from urllib.parse import urlparse
+    from pop_pay.engine.guardrails import _match_vendor
     page_domain = urlparse(page_url).netloc.lower().removeprefix("www.") if page_url else ""
-    page_domain_tokens = set(re.split(r'[\s\-_./]+', page_domain)) - {''}
-
-    vendor_allowed = (
-        vendor_lower in allowed_lower                          # exact: "aws" == "aws"
-        or any(tok in allowed_lower for tok in vendor_tokens) # token: "aws" in ["aws",...]
-        or any(                                                # token-subset: all words of "maker faire"
-            set(re.split(r'[\s\-_./]+', cat)) - {''} <= vendor_tokens  # appear in vendor tokens
-            for cat in allowed_lower
-        )
-        or any(                                                # fallback: match against page domain
-            set(re.split(r'[\s\-_./]+', cat)) - {''} <= page_domain_tokens
-            for cat in allowed_lower
-        )
-    )
+    vendor_allowed = _match_vendor(target_vendor, allowed_categories, page_domain=page_domain)
     if not vendor_allowed:
         return (
             f"Vendor '{target_vendor}' is not in your allowed categories. "

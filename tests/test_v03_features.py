@@ -148,7 +148,7 @@ async def test_langchain_tool_injector_failure_feedback():
 
     # Mock injector that always fails
     mock_injector = MagicMock()
-    mock_injector.inject_payment_info = AsyncMock(return_value=False)
+    mock_injector.inject_payment_info = AsyncMock(return_value={"card_filled": False, "billing_filled": False, "blocked_reason": ""})
 
     tool = PopPaymentTool(client=client, agent_id="test-agent", injector=mock_injector)
     result = await tool._arun(

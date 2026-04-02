@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.17] - 2026-04-02
+
+### Fixed
+- **Vendor matching unified (`_match_vendor`):** Extracted shared `_match_vendor()` helper in `guardrails.py`. Both `GuardrailEngine.evaluate_intent()` and `request_purchaser_info` MCP tool now use the same logic — token-exact, token-in-allowed, token-subset, and page-domain fallback. Eliminates the prior divergence where a vendor could pass one gate but be rejected by the other.
+- **Page domain token min-length filter (H-3):** Short TLD tokens (`io`, `co`, etc.) in `page_url` domain no longer falsely match allowed categories. Tokens shorter than 4 characters are now filtered out before domain-based vendor matching.
+- **LangChain Tool — TOCTOU domain guard added (QUALITY-4):** `PopPaymentInput` now accepts `page_url`; `_arun()` passes `page_url` and `approved_vendor` to `inject_payment_info()`. LangChain path now has the same domain validation as the MCP server path.
+- **LangChain test mock reflects production return format (L-4):** `test_langchain_tool_injector_failure_feedback` mock updated from `return_value=False` to `return_value={"card_filled": False, ...}` — matches the actual dict format `inject_payment_info()` returns.
+
+### Added
+- **`pop-init-vault` template — missing billing fields (L-2):** Generated `.env` template now includes `POP_BILLING_CITY`, `POP_BILLING_STATE`, `POP_BILLING_COUNTRY`, `POP_BILLING_PHONE_COUNTRY_CODE` (commented out with examples).
+
+### Docs
+- **Integration Guide example — CDP injection (L-3 follow-up):** Updated manual integration example to use `PopBrowserInjector` instead of bare `page.fill()` calls — correctly shows that card details flow through the injector from the in-memory seal, not from DB.
+
+---
+
+## [0.6.16] - 2026-04-01
+
+### Fixed
+- **mcp_server.py — RuntimeError not caught:** Vault `load_vault()` raises `RuntimeError` when a hardened vault exists but OSS source is running. Added `RuntimeError` to the `except (ValueError, RuntimeError)` guard — server no longer crashes on startup in this configuration.
+- **langchain.py — dict injection result always truthy:** `inject_payment_info()` returns a dict; `if not injection_ok:` was always `False` for any non-empty dict, masking injection failures and skipping budget rollback. Now inspects `card_filled` key explicitly.
+- **inject_billing_only — missing billing fields:** `billing_info` dict in `inject_billing_only` was missing `city`, `state`, `country`, `phone_country_code`. All `POP_BILLING_*` env vars now consistently read in both `inject_payment_info` and `inject_billing_only`.
+- **llm_guardrails.py — @retry decorator never fires:** All exceptions were caught inside `evaluate_intent`, preventing tenacity from seeing them. Retriable errors (`APIStatusError` with 429/5xx, `APIConnectionError`) now re-raise so tenacity can back off and retry.
+
+### Docs
+- **Integration Guide:** Removed non-existent `get_seal_details()` call; replaced with correct `seal.card_number / .cvv / .expiration_date` access pattern.
+- **README:** Added explicit note that Stripe Issuing returns last-4-only — CDP auto-injection is incompatible with Stripe Issuing; use BYOC for CDP injection.
+
+---
+
 ## [0.6.15] - 2026-04-01
 
 ### Fixed

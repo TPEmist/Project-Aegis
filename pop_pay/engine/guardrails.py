@@ -8,6 +8,30 @@ def _tokenize(s: str) -> set:
     return set(re.split(r'[\s\-_./]+', s.lower()))
 
 
+def _match_vendor(vendor_name: str, allowed_categories: list, page_domain: str = "") -> bool:
+    """Unified vendor matching used by both GuardrailEngine and request_purchaser_info MCP tool."""
+    vendor_lower = vendor_name.lower()
+    vendor_tokens = _tokenize(vendor_name)
+    allowed_lower = [c.lower() for c in allowed_categories]
+    page_domain_tokens = {
+        tok for tok in re.split(r'[\s\-_./]+', page_domain.lower().removeprefix("www."))
+        if tok and len(tok) >= 4
+    } if page_domain else set()
+
+    return (
+        vendor_lower in allowed_lower
+        or any(tok in allowed_lower for tok in vendor_tokens)
+        or any(
+            _tokenize(cat) - {''} <= vendor_tokens
+            for cat in allowed_lower
+        )
+        or bool(page_domain and any(
+            _tokenize(cat) - {''} <= page_domain_tokens
+            for cat in allowed_lower
+        ))
+    )
+
+
 from pop_pay.engine.known_processors import KNOWN_PAYMENT_PROCESSORS  # noqa: F401
 
 KNOWN_VENDOR_DOMAINS = {
@@ -31,16 +55,7 @@ KNOWN_VENDOR_DOMAINS = {
 class GuardrailEngine:
     async def evaluate_intent(self, intent: PaymentIntent, policy: GuardrailPolicy) -> tuple[bool, str]:
         # Rule 1: Vendor/Category check
-        vendor_lower = intent.target_vendor.lower()
-        vendor_tokens = _tokenize(intent.target_vendor)
-        vendor_allowed = False
-
-        for category in policy.allowed_categories:
-            cat_lower = category.lower()
-            cat_tokens = _tokenize(category)
-            if vendor_tokens & cat_tokens or vendor_lower == cat_lower:
-                vendor_allowed = True
-                break
+        vendor_allowed = _match_vendor(intent.target_vendor, policy.allowed_categories)
 
         if not vendor_allowed:
             return False, "Vendor not in allowed categories"
