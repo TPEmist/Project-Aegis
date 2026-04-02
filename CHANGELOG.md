@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.15] - 2026-04-01
+
+### Fixed
+- **`inject_payment_info` missing billing fields:** The `billing_info` dict built inside `inject_payment_info` was not updated when city/state/country/phone_country_code were added in v0.6.12–0.6.14. Fields were correctly wired in `_fill_billing_fields()` but never populated — phone country code, country, state, and city injection silently failed via `request_virtual_card`. All fields now read from env vars consistently.
+
+## [0.6.14] - 2026-04-01
+
+### Changed
+- **Phone country code auto-derive:** Refactored to remove `POP_BILLING_PHONE_NATIONAL`. `_national_number()` derives national number from E.164 + country code via 50-country dial code table. Accepts ISO alpha-2 (`"US"`), dial prefix (`"+1"`), or raw digits.
+
 ## [0.6.13] - 2026-04-01
 
 ### Added
