@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.12] - 2026-04-01
+
+### Added
+- **Dropdown field support:** New `_select_option()` helper tries exact value → exact label → case-insensitive fuzzy match against option text. New `_fill_field()` helper detects `<select>` vs `<input>` at runtime and routes accordingly — all existing and future fields get dropdown support automatically.
+- **Country, state, city billing fields:** `POP_BILLING_COUNTRY`, `POP_BILLING_STATE`, `POP_BILLING_CITY` env vars. Injector fills the corresponding form fields, including dropdown variants (`select[name='country']`, etc.).
+- **New selectors:** `COUNTRY_SELECTORS`, `STATE_SELECTORS`, `CITY_SELECTORS` covering `autocomplete`, `name`, `id`, `aria-label` attributes for both `<select>` and `<input>` variants.
+
+### Changed
+- `_fill_billing_fields()` refactored to use unified `_fill_field()` — ~50 lines removed, all fields now handled consistently.
+- `byoc_local.py` `billing_info` dict extended with `city`, `state`, `country`.
+- `.env.example` updated with new billing fields and inline comments.
+
 ## [0.6.11] - 2026-04-01
 
 ### Changed

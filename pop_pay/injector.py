@@ -169,6 +169,56 @@ PHONE_SELECTORS = [
     "input[aria-label*='phone']",
 ]
 
+# Dropdown-capable selectors: include both <select> and <input> variants.
+# _fill_field() detects the tag at runtime and uses select_option() or fill()
+# accordingly — no separate logic needed when adding new dropdown fields.
+
+COUNTRY_SELECTORS = [
+    "select[autocomplete='country']",
+    "select[autocomplete='country-name']",
+    "select[name='country']",
+    "select[name='billing_country']",
+    "select[name='billingCountry']",
+    "select[id='country']",
+    "select[id*='country']",
+    "select[aria-label*='Country']",
+    "select[aria-label*='country']",
+    "input[autocomplete='country']",
+    "input[autocomplete='country-name']",
+    "input[name='country']",
+]
+
+STATE_SELECTORS = [
+    "select[autocomplete='address-level1']",
+    "select[name='state']",
+    "select[name='province']",
+    "select[name='region']",
+    "select[name='billing_state']",
+    "select[id='state']",
+    "select[id*='state']",
+    "select[id*='province']",
+    "select[aria-label*='State']",
+    "select[aria-label*='state']",
+    "select[aria-label*='Province']",
+    "input[autocomplete='address-level1']",
+    "input[name='state']",
+    "input[name='province']",
+]
+
+CITY_SELECTORS = [
+    "input[autocomplete='address-level2']",
+    "input[name='city']",
+    "input[name='town']",
+    "input[name='billing_city']",
+    "input[id='city']",
+    "input[id*='city']",
+    "input[placeholder*='City']",
+    "input[placeholder*='city']",
+    "input[aria-label*='City']",
+    "select[autocomplete='address-level2']",
+    "select[name='city']",
+]
+
 
 class PopBrowserInjector:
     """
@@ -478,15 +528,81 @@ class PopBrowserInjector:
 
         return True
 
+    async def _select_option(self, locator, value: str) -> bool:
+        """
+        Select a <select> option by value, label, or fuzzy label match.
+        Tries in order: exact value → exact label → case-insensitive partial match.
+        Returns True if an option was selected.
+        """
+        # Exact value match
+        try:
+            await locator.select_option(value=value)
+            return True
+        except Exception:
+            pass
+        # Exact label match
+        try:
+            await locator.select_option(label=value)
+            return True
+        except Exception:
+            pass
+        # Fuzzy match against option text / value
+        try:
+            options = await locator.evaluate(
+                "el => Array.from(el.options).map(o => ({value: o.value, text: o.text.trim()}))"
+            )
+            value_lower = value.lower()
+            # Exact case-insensitive
+            for opt in options:
+                if value_lower in (opt["text"].lower(), opt["value"].lower()):
+                    await locator.select_option(value=opt["value"])
+                    return True
+            # Partial: user value contained in option text, or option text in user value
+            for opt in options:
+                opt_text = opt["text"].lower()
+                if value_lower in opt_text or opt_text in value_lower:
+                    await locator.select_option(value=opt["value"])
+                    return True
+        except Exception:
+            pass
+        return False
+
+    async def _fill_field(
+        self, frame, selectors: list, value: str, field_name: str
+    ) -> bool:
+        """
+        Fill a billing field that may be either <input> or <select>.
+        Detects the tag at runtime — no separate handling needed per field type.
+        Returns True if the field was filled/selected.
+        """
+        if not value:
+            return False
+        locator = await self._find_visible_locator(frame, selectors)
+        if not locator:
+            return False
+        try:
+            tag = await locator.evaluate("el => el.tagName.toLowerCase()")
+            if tag == "select":
+                filled = await self._select_option(locator, value)
+            else:
+                await locator.fill(value)
+                filled = True
+            if filled:
+                logger.info("PopBrowserInjector: %s injected.", field_name)
+            return filled
+        except Exception as exc:
+            logger.debug("PopBrowserInjector: could not fill %s: %s", field_name, exc)
+            return False
+
     async def _fill_billing_fields(self, page, billing_info: dict) -> bool:
         """
-        Fill billing detail fields (name, address, email) in the main page frame.
-        These fields are standard DOM inputs — NOT inside Stripe iframes.
+        Fill billing detail fields in the main page frame.
+        These fields are standard DOM inputs/selects — NOT inside Stripe iframes.
 
         Each field is attempted independently; missing selectors are silently skipped.
         Returns True if at least one billing field was successfully filled.
         """
-        main_frame = page.main_frame
+        f = page.main_frame
         any_filled = False
 
         first_name = billing_info.get("first_name", "")
@@ -495,90 +611,28 @@ class PopBrowserInjector:
         zip_code   = billing_info.get("zip", "")
         email      = billing_info.get("email", "")
         phone      = billing_info.get("phone", "")
+        country    = billing_info.get("country", "")
+        state      = billing_info.get("state", "")
+        city       = billing_info.get("city", "")
 
-        # First name
-        if first_name:
-            locator = await self._find_visible_locator(main_frame, FIRST_NAME_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(first_name)
-                    logger.info("PopBrowserInjector: first name injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug("PopBrowserInjector: could not fill first name: %s", exc)
+        if await self._fill_field(f, FIRST_NAME_SELECTORS, first_name, "first name"):
+            any_filled = True
+        if await self._fill_field(f, LAST_NAME_SELECTORS, last_name, "last name"):
+            any_filled = True
 
-        # Last name
-        if last_name:
-            locator = await self._find_visible_locator(main_frame, LAST_NAME_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(last_name)
-                    logger.info("PopBrowserInjector: last name injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug("PopBrowserInjector: could not fill last name: %s", exc)
-
-        # Full name fallback — only used when first+last name fields are absent
-        # but a combined "name" field exists on the page
+        # Full name fallback — only when no split first/last fields found
         if first_name or last_name:
             full_name = " ".join(filter(None, [first_name, last_name])).strip()
-            if full_name:
-                locator = await self._find_visible_locator(main_frame, FULL_NAME_SELECTORS)
-                if locator:
-                    try:
-                        await locator.fill(full_name)
-                        logger.info("PopBrowserInjector: full name injected.")
-                        any_filled = True
-                    except Exception as exc:
-                        logger.debug(
-                            "PopBrowserInjector: could not fill full name: %s", exc
-                        )
+            if await self._fill_field(f, FULL_NAME_SELECTORS, full_name, "full name"):
+                any_filled = True
 
-        # Street address
-        if street:
-            locator = await self._find_visible_locator(main_frame, STREET_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(street)
-                    logger.info("PopBrowserInjector: street address injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug(
-                        "PopBrowserInjector: could not fill street address: %s", exc
-                    )
-
-        # Zip / postal code
-        if zip_code:
-            locator = await self._find_visible_locator(main_frame, ZIP_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(zip_code)
-                    logger.info("PopBrowserInjector: zip code injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug("PopBrowserInjector: could not fill zip code: %s", exc)
-
-        # Email
-        if email:
-            locator = await self._find_visible_locator(main_frame, EMAIL_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(email)
-                    logger.info("PopBrowserInjector: email injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug("PopBrowserInjector: could not fill email: %s", exc)
-
-        # Phone (E.164 format, e.g. +14155551234)
-        if phone:
-            locator = await self._find_visible_locator(main_frame, PHONE_SELECTORS)
-            if locator:
-                try:
-                    await locator.fill(phone)
-                    logger.info("PopBrowserInjector: phone injected.")
-                    any_filled = True
-                except Exception as exc:
-                    logger.debug("PopBrowserInjector: could not fill phone: %s", exc)
+        if await self._fill_field(f, STREET_SELECTORS,  street,   "street"):    any_filled = True
+        if await self._fill_field(f, CITY_SELECTORS,    city,     "city"):      any_filled = True
+        if await self._fill_field(f, STATE_SELECTORS,   state,    "state"):     any_filled = True
+        if await self._fill_field(f, COUNTRY_SELECTORS, country,  "country"):   any_filled = True
+        if await self._fill_field(f, ZIP_SELECTORS,     zip_code, "zip"):       any_filled = True
+        if await self._fill_field(f, EMAIL_SELECTORS,   email,    "email"):     any_filled = True
+        if await self._fill_field(f, PHONE_SELECTORS,   phone,    "phone"):     any_filled = True
 
         return any_filled
 

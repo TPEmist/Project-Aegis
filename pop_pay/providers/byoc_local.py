@@ -16,6 +16,9 @@ class LocalVaultProvider(VirtualCardProvider):
         self._billing_first_name = os.getenv("POP_BILLING_FIRST_NAME", "").strip()
         self._billing_last_name  = os.getenv("POP_BILLING_LAST_NAME", "").strip()
         self._billing_street     = os.getenv("POP_BILLING_STREET", "").strip()
+        self._billing_city       = os.getenv("POP_BILLING_CITY", "").strip()
+        self._billing_state      = os.getenv("POP_BILLING_STATE", "").strip()
+        self._billing_country    = os.getenv("POP_BILLING_COUNTRY", "").strip()
         self._billing_zip        = os.getenv("POP_BILLING_ZIP", "").strip()
         self._billing_email      = os.getenv("POP_BILLING_EMAIL", "").strip()
         self._billing_phone      = os.getenv("POP_BILLING_PHONE", "").strip()
@@ -30,6 +33,9 @@ class LocalVaultProvider(VirtualCardProvider):
             "first_name": self._billing_first_name,
             "last_name":  self._billing_last_name,
             "street":     self._billing_street,
+            "city":       self._billing_city,
+            "state":      self._billing_state,
+            "country":    self._billing_country,
             "zip":        self._billing_zip,
             "email":      self._billing_email,
             "phone":      self._billing_phone,
