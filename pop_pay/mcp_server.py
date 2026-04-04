@@ -127,61 +127,54 @@ if auto_inject:
 
 
 # ---------------------------------------------------------------------------
-# MCP Tool
+# Private helper: core scan logic (not an MCP tool)
 # ---------------------------------------------------------------------------
 
-@mcp.tool()
-async def page_snapshot(page_url: str) -> str:
-    """Analyze the checkout page for security risks and prompt injection before payment.
+async def _scan_page(page_url: str) -> dict:
+    """Fetch and scan a checkout page for prompt injection and security signals.
 
-    Scans for:
-    - hidden text with high semantic content
-    - zero-pixel elements containing text
-    - display:none blocks with instructions
-    - SSL anomalies
-    - Unexpected redirects
-    - Price mismatches (basic detection)
-
-    This tool MUST be called before request_virtual_card.
+    Returns a dict with keys:
+      - flags: list of string flag names detected
+      - snapshot_id: UUID string for this scan
+      - safe: bool (False if hidden_instructions_detected, True otherwise)
+      - error: str | None — set if the page could not be fetched
     """
     snapshot_id = str(uuid.uuid4())
-    flags = []
+    flags: list[str] = []
     html = ""
 
     # Guard: block SSRF attempts (private IPs, loopback, non-https)
     try:
         _parsed = urlparse(page_url)
         if _parsed.scheme != "https":
-            return "ERROR: page_snapshot only accepts https:// URLs."
+            return {"flags": ["invalid_url"], "snapshot_id": snapshot_id, "safe": False, "error": "page_snapshot only accepts https:// URLs."}
         _host = _parsed.hostname or ""
         try:
             _addr = ipaddress.ip_address(_host)
             if _addr.is_private or _addr.is_loopback or _addr.is_link_local or _addr.is_reserved:
-                return "ERROR: page_snapshot does not allow requests to private/internal addresses."
+                return {"flags": ["ssrf_blocked"], "snapshot_id": snapshot_id, "safe": False, "error": "page_snapshot does not allow requests to private/internal addresses."}
         except ValueError:
             pass  # hostname (not raw IP) — allow
     except Exception:
-        return "ERROR: Invalid URL."
+        return {"flags": ["invalid_url"], "snapshot_id": snapshot_id, "safe": False, "error": "Invalid URL."}
 
-    # 1. Fetch HTML and Check SSL/Redirects
+    # 1. Fetch HTML and check SSL/redirects
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as http_client:
             response = await http_client.get(page_url)
             html = response.text
-            
+
             if urlparse(str(response.url)).netloc != urlparse(page_url).netloc:
                 flags.append("unexpected_redirect")
-            
+
             if not page_url.startswith("https://"):
                 flags.append("ssl_anomaly")
     except Exception as e:
         flags.append("ssl_anomaly")
-        return f"Error fetching page for snapshot: {str(e)}"
+        return {"flags": flags, "snapshot_id": snapshot_id, "safe": False, "error": f"Error fetching page: {e}"}
 
-    # 2. Prompt Injection Signal Scanning
+    # 2. Prompt injection signal scanning
     hidden_instructions_detected = False
-    
-    # Scan for hidden elements with instructions
     instruction_keywords = ["ignore", "instead", "system", "user", "override", "instruction", "always", "never", "prompt"]
 
     for match in _HIDDEN_STYLE_RE.finditer(html):
@@ -193,7 +186,7 @@ async def page_snapshot(page_url: str) -> str:
     if hidden_instructions_detected:
         flags.append("hidden_instructions_detected")
 
-    # 3. Price Mismatch (Basic heuristic)
+    # 3. Price mismatch (basic heuristic)
     prices = _PRICE_RE.findall(html)
     if len(set(prices)) > 2:
         flags.append("price_mismatch")
@@ -205,17 +198,53 @@ async def page_snapshot(page_url: str) -> str:
     snapshot_cache[page_url] = {
         "snapshot_id": snapshot_id,
         "timestamp": datetime.now(),
-        "flags": flags
+        "flags": flags,
     }
 
-    if "hidden_instructions_detected" in flags:
-        return f"ABORT: Potential prompt injection detected! Snapshot ID: {snapshot_id}. Flags: {flags}. Instructions found in hidden elements. Do not proceed with payment."
+    safe = "hidden_instructions_detected" not in flags
+    return {"flags": flags, "snapshot_id": snapshot_id, "safe": safe, "error": None}
+
+
+# ---------------------------------------------------------------------------
+# MCP Tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def page_snapshot(page_url: str) -> str:
+    """Analyze the checkout page for security risks and prompt injection (optional / informational).
+
+    Scans for:
+    - hidden text with high semantic content
+    - zero-pixel elements containing text
+    - display:none blocks with instructions
+    - SSL anomalies
+    - Unexpected redirects
+    - Price mismatches (basic detection)
+
+    This tool is OPTIONAL — the same scan runs automatically inside request_virtual_card
+    whenever a page_url is provided.  Call this proactively if you want early warning
+    before navigating to the payment form.
+    """
+    result = await _scan_page(page_url)
+
+    if result.get("error"):
+        return f"ERROR: {result['error']}"
+
+    snapshot_id = result["snapshot_id"]
+    flags = result["flags"]
+
+    if not result["safe"]:
+        return (
+            f"ABORT: Potential prompt injection detected! Snapshot ID: {snapshot_id}. "
+            f"Flags: {flags}. Instructions found in hidden elements. "
+            f"Do not proceed with payment."
+        )
 
     return json.dumps({
         "snapshot_id": snapshot_id,
         "flags": flags,
         "status": "COMPLETED",
-        "message": "Page snapshot completed and verified. You may proceed to request_virtual_card."
+        "message": "Page snapshot completed and verified. You may proceed to request_virtual_card.",
     }, indent=2)
 
 
@@ -249,20 +278,39 @@ async def request_virtual_card(
     """
     
     # -------------------------------------------------------------------
-    # P1: Check snapshot cache (mandatory pre-flight check)
+    # P1: Automatic security scan (runs whenever page_url is provided)
     # -------------------------------------------------------------------
-    valid_snapshot = False
-    if page_url in snapshot_cache:
-        snap = snapshot_cache[page_url]
-        if datetime.now() - snap['timestamp'] < timedelta(minutes=5):
-            valid_snapshot = True
-    
-    if not valid_snapshot and page_url:
-        return (
-            "WARNING: No valid security snapshot found for this URL. "
-            "For your safety, please run 'page_snapshot(page_url)' before 'request_virtual_card'. "
-            "This ensures the page is scanned for hidden prompt injections or malicious instructions."
-        )
+    scan_note = ""
+    if page_url:
+        # Check cache first (reuse recent scan within 5 minutes)
+        cached = snapshot_cache.get(page_url)
+        if cached and datetime.now() - cached["timestamp"] < timedelta(minutes=5):
+            scan_result = {
+                "flags": cached["flags"],
+                "snapshot_id": cached["snapshot_id"],
+                "safe": "hidden_instructions_detected" not in cached["flags"],
+                "error": None,
+            }
+        else:
+            scan_result = await _scan_page(page_url)
+
+        if scan_result.get("error"):
+            # Network/URL error — treat as unsafe; do not issue card
+            return (
+                f"Payment rejected. Security scan failed: {scan_result['error']} "
+                f"Snapshot ID: {scan_result['snapshot_id']}. "
+                f"Fix the URL or skip page_url if the checkout has no associated URL."
+            )
+
+        if not scan_result["safe"]:
+            return (
+                f"Payment rejected. Security scan detected hidden prompt injection. "
+                f"Snapshot ID: {scan_result['snapshot_id']}. "
+                f"Flags: {scan_result['flags']}. "
+                f"Do not retry this payment."
+            )
+    else:
+        scan_note = " (security scan skipped — no page_url provided)"
 
     intent = PaymentIntent(
         agent_id="mcp-agent",
@@ -273,8 +321,9 @@ async def request_virtual_card(
     )
     seal = await client.process_payment(intent)
 
-    # Webhook Notification (if enabled)
-    if seal.status.lower() != "rejected" and policy.webhook_url:
+    # Webhook Notification (if enabled) — fires for ALL outcomes including rejections
+    # so operators can monitor attack attempts and guardrail triggers.
+    if policy.webhook_url:
         try:
             async with httpx.AsyncClient() as webhook_client:
                 payload = {
@@ -283,7 +332,8 @@ async def request_virtual_card(
                     "status": seal.status,
                     "agent_id": intent.agent_id,
                     "reasoning": intent.reasoning,
-                    "seal_id": seal.seal_id
+                    "seal_id": seal.seal_id,
+                    "rejection_reason": seal.rejection_reason if seal.status.lower() == "rejected" else None,
                 }
                 await webhook_client.post(policy.webhook_url, json=payload, timeout=5.0)
         except Exception:
@@ -345,7 +395,8 @@ async def request_virtual_card(
         )
         return (
             f"Payment approved and securely auto-injected into the browser form."
-            f"{billing_note} "
+            f"{billing_note}"
+            f"{scan_note} "
             f"Please proceed to click the submit/pay button. "
             f"Masked card: {masked_card}"
         )
@@ -356,6 +407,7 @@ async def request_virtual_card(
     return (
         f"Payment approved. Card Issued: {masked_card}, "
         f"Expiry: {seal.expiration_date}, Amount: {seal.authorized_amount}"
+        f"{scan_note}"
     )
 
 
