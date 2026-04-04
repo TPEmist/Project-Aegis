@@ -1,6 +1,6 @@
 # pop-pay Payment Skill for OpenClaw
 
-**Version**: 0.6.17  
+**Version**: 0.6.18  
 **Author**: Point One Percent  
 **License**: MIT  
 **Install**: `pip install pop-pay` → `pop-pay setup` → add MCP server to your agent
