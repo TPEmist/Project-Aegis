@@ -1,6 +1,6 @@
 ---
 name: pop-pay
-version: "0.6.20"
+version: "0.6.21"
 description: "Your card stays in your local vault — no SaaS, no login, no external account. pop-pay injects credentials directly into checkout forms via CDP (Chrome DevTools Protocol), keeping them out of the AI's context window entirely."
 homepage: https://github.com/TPEmist/Point-One-Percent
 author: Point One Percent
@@ -15,8 +15,6 @@ requires:
     - POP_AUTO_INJECT
     - POP_REQUIRE_HUMAN_APPROVAL
     - POP_GUARDRAIL_ENGINE
-    - POP_WEBHOOK_URL
-    - POP_LLM_API_KEY
 ---
 
 ## What This Skill Does

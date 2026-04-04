@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.21] - 2026-04-05
+
+### Fixed
+- **ClawHub SKILL.md `requires.env`:** Removed `POP_WEBHOOK_URL` and `POP_LLM_API_KEY` from the required env declarations. These vars are optional (webhook notifications are disabled by default; LLM guardrail mode is opt-in). Listing them as required caused the ClawHub scanner to flag an incorrect "required but optional" policy violation.
+
 ## [0.6.19] - 2026-04-04
 
 ### Removed
