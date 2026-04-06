@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.34] - 2026-04-06
+
+### Fixed
+- **Select dropdown — fill order (root cause):** Filling `<input>` fields triggers framework re-renders (Zoho, React) that reset previously selected `<select>` dropdowns. Fix: inputs first (name, street, city, zip, email), selects last (country, state). Removed diagnostic code from v0.6.30-v0.6.33.
+
 ## [0.6.32] - 2026-04-06
 
 ### Fixed

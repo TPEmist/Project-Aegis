@@ -857,29 +857,6 @@ class PopBrowserInjector:
         filled = []
         failed = []
         skipped = []
-        _diag = []  # diagnostic info for select debugging
-
-        # --- Direct select test (same call as Playwright MCP) ---
-        state_raw_val = billing_info.get("state", "")
-        state_expanded = US_STATE_CODES.get(state_raw_val.upper(), state_raw_val) if len(state_raw_val) == 2 else state_raw_val
-        country_val = billing_info.get("country", "")
-        try:
-            await page.get_by_label("State").select_option([state_expanded])
-            _diag.append(f"DIRECT_STATE=ok({state_expanded})")
-        except Exception as e:
-            _diag.append(f"DIRECT_STATE=fail({e})")
-        try:
-            await page.get_by_label("Country").select_option([country_val])
-            _diag.append(f"DIRECT_COUNTRY=ok({country_val})")
-        except Exception as e:
-            # Try with "Country / Region" which is the aria-label in Zoho
-            try:
-                await page.get_by_label("Country / Region").select_option([country_val])
-                _diag.append(f"DIRECT_COUNTRY=ok_alt({country_val})")
-            except Exception as e2:
-                _diag.append(f"DIRECT_COUNTRY=fail({e2})")
-        # --- End direct test ---
-
         first_name = billing_info.get("first_name", "")
         last_name  = billing_info.get("last_name", "")
         street     = billing_info.get("street", "")
@@ -902,20 +879,24 @@ class PopBrowserInjector:
             else:
                 failed.append(f"{name} (value='{value}')")
 
+        # Fill ORDER matters: input fields first, then select dropdowns last.
+        # Reason: filling inputs can trigger framework re-renders (React, Zoho)
+        # which reset previously selected dropdowns. Selects go last to survive.
+
+        # --- Input fields first ---
         await _try(FIRST_NAME_SELECTORS, first_name, "first_name", label="First name")
         await _try(LAST_NAME_SELECTORS, last_name, "last_name", label="Last name")
-
-        # Full name fallback — only when no split first/last fields found
         if first_name or last_name:
             full_name = " ".join(filter(None, [first_name, last_name])).strip()
             await _try(FULL_NAME_SELECTORS, full_name, "full_name", label="Full name")
-
         await _try(STREET_SELECTORS,  street,   "street",  label="Address")
         await _try(CITY_SELECTORS,    city,     "city",    label="City")
-        await _try(STATE_SELECTORS,   state,    "state",   label="State")
-        await _try(COUNTRY_SELECTORS, country,  "country", label="Country")
         await _try(ZIP_SELECTORS,     zip_code, "zip",     label="Zip")
         await _try(EMAIL_SELECTORS,   email,    "email",   label="Email")
+
+        # --- Select dropdowns last (survive re-renders) ---
+        await _try(COUNTRY_SELECTORS, country,  "country", label="Country")
+        await _try(STATE_SELECTORS,   state,    "state",   label="State")
 
         # Phone: fill country code dropdown first (if present), then number field.
         phone_country_code = billing_info.get("phone_country_code", "")
@@ -929,7 +910,7 @@ class PopBrowserInjector:
         phone_value = _national_number(phone, phone_country_code) if cc_filled else phone
         await _try(PHONE_SELECTORS, phone_value, "phone")
 
-        result = {"filled": filled, "failed": failed, "skipped": skipped, "select_diag": _diag}
+        result = {"filled": filled, "failed": failed, "skipped": skipped}
         logger.info("PopBrowserInjector: billing results: %s", result)
         return result
 
