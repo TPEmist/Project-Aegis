@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.30] - 2026-04-06
+
+### Changed
+- **Select dropdown diagnostic:** After `select_option()`, verify value by reading back `el.value`. If empty, report diagnostic in MCP response: element visibility, name, option count, frame URL. Enables root-cause identification without server logs.
+
+## [0.6.29] - 2026-04-06
+
+### Fixed
+- **Select dropdown — native setter fallback:** Root cause: Playwright's `select_option()` silently succeeds but the value doesn't stick on React/Angular/Zoho forms (framework overrides the native setter). Fix: after `select_option()`, verify the value by reading it back. If mismatch, use `HTMLSelectElement.prototype.value` native setter to bypass framework interception, plus full event chain (focusin → focus → mousedown → mouseup → click → input → change → blur → focusout).
+
 ## [0.6.28] - 2026-04-06
 
 ### Changed
