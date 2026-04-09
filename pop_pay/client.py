@@ -49,12 +49,19 @@ class PopClient:
             
         # Issue card
         seal = await self.provider.issue_card(intent, self.policy)
+
+        # Task B: Initial state should be 'Pending' if not rejected
+        record_status = seal.status
+        if record_status.lower() != "rejected":
+            record_status = "Pending"
+            seal.status = "Pending"
+
         # Record seal (success or rejection from provider) — only masked card stored
         self.state_tracker.record_seal(
             seal.seal_id,
             seal.authorized_amount,
             intent.target_vendor,
-            status=seal.status,
+            status=record_status,
             masked_card=f"****-****-****-{seal.card_number[-4:]}" if seal.card_number else "****-****-****-????",
             expiration_date=seal.expiration_date
         )

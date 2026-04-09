@@ -127,7 +127,7 @@ async def test_pop_client_process_payment_approved():
     assert seal is not None
     assert seal.seal_id
     # MockStripeProvider always approves within-budget, within-limit requests
-    assert seal.status in ("Issued", "Rejected")
+    assert seal.status in ("Pending", "Rejected")
     client.state_tracker.close()
 
 

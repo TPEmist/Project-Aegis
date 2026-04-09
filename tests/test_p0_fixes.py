@@ -29,7 +29,7 @@ async def test_daily_budget_enforcement():
     
     # First payment: OK
     seal1 = await client.process_payment(intent)
-    assert seal1.status == "Issued"
+    assert seal1.status == "Pending"
     assert client.state_tracker.daily_spend_total == 100.0
     
     # Second payment: Should exceed budget (100 + 100 > 150)

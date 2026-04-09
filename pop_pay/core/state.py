@@ -1,5 +1,11 @@
 import sqlite3
+import os
+import base64
+import hashlib
+import hmac
+import socket
 from datetime import date
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class PopStateTracker:
     def __init__(self, db_path: str = "pop_state.db"):
@@ -9,6 +15,44 @@ class PopStateTracker:
         self.conn = sqlite3.connect(self.db_path)
         self._init_db()
         self.daily_spend_total = self._get_today_spent()
+
+    def _get_encryption_key(self) -> bytes:
+        """Get the encryption key from env or fallback to host-specific HMAC."""
+        key_hex = os.environ.get("POP_STATE_ENCRYPTION_KEY")
+        if key_hex:
+            try:
+                return bytes.fromhex(key_hex)
+            except ValueError:
+                pass
+        # Fallback: HMAC-SHA256 of hostname for machine-specific at-rest security
+        return hmac.new(b"pop-pay-state-salt", socket.gethostname().encode(), hashlib.sha256).digest()
+
+    def _encrypt_field(self, value: str | None) -> str | None:
+        """Encrypt a string field using AES-256-GCM."""
+        if value is None:
+            return None
+        key = self._get_encryption_key()
+        aesgcm = AESGCM(key)
+        nonce = os.urandom(12)
+        ciphertext = aesgcm.encrypt(nonce, value.encode(), None)
+        return base64.b64encode(nonce + ciphertext).decode('utf-8')
+
+    def _decrypt_field(self, encrypted: str | None) -> str | None:
+        """Decrypt a string field. Fallbacks to raw value if decryption fails."""
+        if encrypted is None:
+            return None
+        try:
+            data = base64.b64decode(encrypted)
+            if len(data) < 12:
+                return encrypted
+            nonce = data[:12]
+            ciphertext = data[12:]
+            key = self._get_encryption_key()
+            aesgcm = AESGCM(key)
+            decrypted = aesgcm.decrypt(nonce, ciphertext, None)
+            return decrypted.decode('utf-8')
+        except Exception:
+            return encrypted  # Fallback to raw value (for legacy unencrypted data)
 
     def _init_db(self):
         cursor = self.conn.cursor()
@@ -96,11 +140,12 @@ class PopStateTracker:
         self.daily_spend_total = self._get_today_spent()
 
     def record_seal(self, seal_id: str, amount: float, vendor: str, status: str = "Issued", masked_card: str = None, expiration_date: str = None):
+        encrypted_card = self._encrypt_field(masked_card)
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO issued_seals (seal_id, amount, vendor, status, masked_card, expiration_date)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (seal_id, amount, vendor, status, masked_card, expiration_date))
+        """, (seal_id, amount, vendor, status, encrypted_card, expiration_date))
         self.conn.commit()
 
     def get_seal_masked_card(self, seal_id: str) -> str:
@@ -108,7 +153,15 @@ class PopStateTracker:
         cursor = self.conn.cursor()
         cursor.execute("SELECT masked_card FROM issued_seals WHERE seal_id = ?", (seal_id,))
         row = cursor.fetchone()
-        return row[0] if row else ""
+        if row and row[0]:
+            return self._decrypt_field(row[0])
+        return ""
+
+    def update_seal_status(self, seal_id: str, status: str):
+        """Update the status of an existing seal."""
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE issued_seals SET status = ? WHERE seal_id = ?", (status, seal_id))
+        self.conn.commit()
 
     def mark_used(self, seal_id: str):
         cursor = self.conn.cursor()

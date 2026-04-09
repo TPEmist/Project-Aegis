@@ -449,6 +449,9 @@ async def request_virtual_card(
             billing_note = " Billing fields filled."
         else:
             billing_note = ""
+        # Injection succeeded — promote Pending → Issued
+        client.state_tracker.update_seal_status(seal.seal_id, "Issued")
+
         return (
             f"Payment approved and securely auto-injected into the browser form."
             f"{billing_note}"
@@ -458,8 +461,10 @@ async def request_virtual_card(
         )
 
     # -------------------------------------------------------------------
-    # Standard path: return masked card details only
+    # Standard path: return masked card details only — promote Pending → Issued
     # -------------------------------------------------------------------
+    client.state_tracker.update_seal_status(seal.seal_id, "Issued")
+
     return (
         f"Payment approved. Card Issued: {masked_card}, "
         f"Expiry: {seal.expiration_date}, Amount: {seal.authorized_amount}"
@@ -618,6 +623,8 @@ async def request_x402_payment(
     if seal.status.lower() == "rejected":
         return f"x402 payment rejected by guardrails. Reason: {seal.rejection_reason}"
 
+    client.state_tracker.update_seal_status(seal.seal_id, "Issued")
+
     # 4. Stub: x402 challenge-response (to be replaced with real Coinbase SDK)
     _x402_logger.warning(
         "x402 payment execution is STUBBED. seal_id=%s amount=%.2f service_url=%s. "
@@ -653,6 +660,9 @@ async def request_x402_payment(
         except Exception:
             pass
 
+    # Promote Pending → Issued
+    client.state_tracker.update_seal_status(seal.seal_id, "Issued")
+
     return (
         f"x402 payment approved (STUBBED). seal_id={seal.seal_id}, amount=${amount:.2f}, "
         f"service_url={service_url}. "
@@ -663,3 +673,4 @@ async def request_x402_payment(
 
 if __name__ == "__main__":
     mcp.run()
+()
