@@ -25,7 +25,9 @@ Guardrails are the "brains" that decide whether a payment should be approved or 
 
 ### Browser Injector (Autonomous Fulfillment)
 For agent frameworks evaluating DOMs, Point One Percent autonomously fulfills authorized payments without leaking the card directly to the LLM. Once the policy and guardrails approve a request, the injection and submission happen without any per-transaction human confirmation.
-- **PopBrowserInjector**: Connects strictly out-of-band via CDP (`Chrome DevTools Protocol`). Traverses cross-origin iframes (i.e. Stripe Elements) and auto-populates `<input>` and `<select>` elements safely. After injection, the agent clicks the submit button — this is a standard browser interaction, not a security concern, since card credentials are never in the agent's context.
+- **PopBrowserInjector**: Connects out-of-band via Playwright's `connectOverCDP` (not raw WebSocket). Traverses cross-origin iframes (including Stripe Elements sandboxed iframes) and Shadow DOM trees, auto-populating `<input>` and `<select>` elements safely. After injection, the agent clicks the submit button — card credentials are never in the agent's context.
+- **PAN encryption at rest**: Card data stored in the state tracker is encrypted with AES-256-GCM. The encryption key is derived from `POP_STATE_ENCRYPTION_KEY` env var or a hostname-based HMAC fallback.
+- **Security scan**: Every page is scanned for hidden prompt-injection elements before card injection proceeds.
 - **Chrome must be launched with `--remote-debugging-port=9222`** before the injector can attach. Use `--user-data-dir` as well if Chrome is already running (required to open a separate CDP-enabled instance).
 - **When using Playwright MCP** (e.g., with Claude Code), configure it with `--cdp-endpoint http://localhost:9222` so that both Playwright MCP and Point One Percent MCP share the same Chrome instance. See [docs/INTEGRATION_GUIDE.md §1](./docs/INTEGRATION_GUIDE.md#1-claude-code--full-setup-with-cdp-injection) for the full setup.
 
@@ -91,11 +93,11 @@ Based on real-world agent testing, two observability gaps have been identified:
 - **Billing field confirmation**: When `PopBrowserInjector` auto-fills billing fields (name, address, email), the agent has no way to confirm what was filled without taking a screenshot. The `request_virtual_card` MCP tool should return a summary of which fields were filled and with what values (excluding the card number itself).
 - **Injection failure transparency**: If card field injection fails (e.g. payment form not found, iframe traversal issue), the MCP tool currently returns a generic error. More granular failure codes would help agents diagnose and report the correct remediation to users.
 
-### 5. CDP Injection Resilience
-The `PopBrowserInjector` handles most common checkout forms and cross-origin Stripe iframes. Contributions are welcome for:
-- Shadow DOM traversal (web components used by some payment processors)
+### 5. Injection Resilience
+The `PopBrowserInjector` uses Playwright's `connectOverCDP` for cross-origin iframe traversal and includes Shadow DOM piercing. Contributions are welcome for:
 - Dynamic form detection (forms that render after JS load with non-standard field naming)
 - Automated test fixtures covering more real-world checkout page structures
+- Additional `<select>` dropdown handling for country/state pickers
 
 ### 6. Security: Opaque Agent Responses
 
