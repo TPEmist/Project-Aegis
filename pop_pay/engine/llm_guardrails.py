@@ -1,7 +1,12 @@
 import json
+from html import escape as _html_escape
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 from pop_pay.engine.guardrails import GuardrailEngine
+
+
+def _escape_xml(s: str) -> str:
+    return _html_escape(s, quote=True)
 
 # Exceptions that warrant a retry (rate limits, transient server errors).
 # Defined at module level so the @retry decorator can reference them before
@@ -34,10 +39,10 @@ class LLMGuardrailEngine:
         prompt = f"""Evaluate the following agent payment intent and determine if it should be approved.
 
 <payment_request>
-  <vendor>{intent.target_vendor}</vendor>
+  <vendor>{_escape_xml(intent.target_vendor)}</vendor>
   <amount>{intent.requested_amount}</amount>
-  <allowed_categories>{policy.allowed_categories}</allowed_categories>
-  <agent_reasoning>{intent.reasoning}</agent_reasoning>
+  <allowed_categories>{_escape_xml(str(policy.allowed_categories))}</allowed_categories>
+  <agent_reasoning>{_escape_xml(intent.reasoning)}</agent_reasoning>
 </payment_request>
 
 Rules:
@@ -61,7 +66,8 @@ Respond ONLY with valid JSON: {{"approved": bool, "reason": str}}"""
             response = await self.client.chat.completions.create(**kwargs)
             result_text = response.choices[0].message.content
             result = json.loads(result_text)
-            return result.get("approved", False), result.get("reason", "Unknown")
+            approved = result.get("approved", False) is True
+            return approved, result.get("reason", "Unknown")
         except self._openai.APIStatusError as e:
             # Re-raise retriable status codes (rate limit, server errors) so
             # tenacity's @retry decorator can back off and retry.

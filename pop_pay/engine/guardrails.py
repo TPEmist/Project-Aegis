@@ -1,5 +1,6 @@
 import re
 import os
+import unicodedata
 from urllib.parse import urlparse
 from pop_pay.core.models import PaymentIntent, GuardrailPolicy
 
@@ -62,7 +63,7 @@ class GuardrailEngine:
 
         # Rule 2: Hallucination/Loop detection
         if policy.block_hallucination_loops:
-            reasoning_lower = intent.reasoning.lower()
+            reasoning_lower = unicodedata.normalize("NFKC", intent.reasoning).lower()
             loop_keywords = ["retry", "failed again", "loop", "ignore previous", "stuck"]
 
             for keyword in loop_keywords:
@@ -72,11 +73,11 @@ class GuardrailEngine:
             # Rule 3: Injection pattern detection
             injection_patterns = [
                 r'\{.*".*".*:',                         # JSON-like structure
-                r'output\s*:',                           # "output:" pattern
-                r'you are now',                          # role injection
-                r'ignore (all |previous |your |the )',   # instruction override
-                r'already (approved|authorized|confirmed)',  # false pre-approval
-                r'system (says|has|override)',            # system impersonation
+                r'\boutput\s*:',                          # "output:" pattern
+                r'\byou are now\b',                      # role injection
+                r'\bignore (all |previous |your |the )', # instruction override
+                r'\balready (approved|authorized|confirmed)\b',  # false pre-approval
+                r'\bsystem (says|has|override)\b',       # system impersonation
             ]
             for pattern in injection_patterns:
                 if re.search(pattern, reasoning_lower):

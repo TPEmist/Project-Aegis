@@ -267,6 +267,45 @@ async def _request_human_approval(
     return True, "auto-approved (no approval webhook configured)"
 
 
+async def _scan_and_validate(page_url: str, action_label: str = "Payment") -> tuple[bool, str]:
+    """Run security scan on page_url. Returns (ok, message).
+
+    ok=True means scan passed (or was skipped). ok=False means the caller
+    should return `message` immediately as a rejection.
+    """
+    if not page_url:
+        return True, f" (security scan skipped — no page_url provided)"
+
+    # Check cache first (reuse recent scan within 5 minutes)
+    cached = snapshot_cache.get(page_url)
+    if cached and datetime.now() - cached["timestamp"] < timedelta(minutes=5):
+        scan_result = {
+            "flags": cached["flags"],
+            "snapshot_id": cached["snapshot_id"],
+            "safe": "hidden_instructions_detected" not in cached["flags"],
+            "error": None,
+        }
+    else:
+        scan_result = await _scan_page(page_url)
+
+    if scan_result.get("error"):
+        return False, (
+            f"{action_label} rejected. Security scan failed: {scan_result['error']} "
+            f"Snapshot ID: {scan_result['snapshot_id']}. "
+            f"Fix the URL or skip page_url if the page has no associated URL."
+        )
+
+    if not scan_result["safe"]:
+        return False, (
+            f"{action_label} rejected. Security scan detected hidden prompt injection. "
+            f"Snapshot ID: {scan_result['snapshot_id']}. "
+            f"Flags: {scan_result['flags']}. "
+            f"Do not retry this."
+        )
+
+    return True, ""
+
+
 # ---------------------------------------------------------------------------
 # MCP Tools
 # ---------------------------------------------------------------------------
@@ -303,37 +342,10 @@ async def request_virtual_card(
     # -------------------------------------------------------------------
     # P1: Automatic security scan (runs whenever page_url is provided)
     # -------------------------------------------------------------------
-    scan_note = ""
-    if page_url:
-        # Check cache first (reuse recent scan within 5 minutes)
-        cached = snapshot_cache.get(page_url)
-        if cached and datetime.now() - cached["timestamp"] < timedelta(minutes=5):
-            scan_result = {
-                "flags": cached["flags"],
-                "snapshot_id": cached["snapshot_id"],
-                "safe": "hidden_instructions_detected" not in cached["flags"],
-                "error": None,
-            }
-        else:
-            scan_result = await _scan_page(page_url)
-
-        if scan_result.get("error"):
-            # Network/URL error — treat as unsafe; do not issue card
-            return (
-                f"Payment rejected. Security scan failed: {scan_result['error']} "
-                f"Snapshot ID: {scan_result['snapshot_id']}. "
-                f"Fix the URL or skip page_url if the checkout has no associated URL."
-            )
-
-        if not scan_result["safe"]:
-            return (
-                f"Payment rejected. Security scan detected hidden prompt injection. "
-                f"Snapshot ID: {scan_result['snapshot_id']}. "
-                f"Flags: {scan_result['flags']}. "
-                f"Do not retry this payment."
-            )
-    else:
-        scan_note = " (security scan skipped — no page_url provided)"
+    scan_ok, scan_msg = await _scan_and_validate(page_url, action_label="Payment")
+    if not scan_ok:
+        return scan_msg
+    scan_note = scan_msg  # empty string when scan passed, skip note when no page_url
 
     # Human approval gate (if POP_APPROVAL_WEBHOOK is configured)
     require_approval = os.getenv("POP_REQUIRE_HUMAN_APPROVAL", "false").lower() == "true"
@@ -503,34 +515,9 @@ async def request_purchaser_info(
     # -------------------------------------------------------------------
     # P1: Automatic security scan (runs whenever page_url is provided)
     # -------------------------------------------------------------------
-    if page_url:
-        # Check cache first (reuse recent scan within 5 minutes)
-        cached = snapshot_cache.get(page_url)
-        if cached and datetime.now() - cached["timestamp"] < timedelta(minutes=5):
-            scan_result = {
-                "flags": cached["flags"],
-                "snapshot_id": cached["snapshot_id"],
-                "safe": "hidden_instructions_detected" not in cached["flags"],
-                "error": None,
-            }
-        else:
-            scan_result = await _scan_page(page_url)
-
-        if scan_result.get("error"):
-            # Network/URL error — treat as unsafe; do not inject info
-            return (
-                f"Billing info rejected. Security scan failed: {scan_result['error']} "
-                f"Snapshot ID: {scan_result['snapshot_id']}. "
-                f"Fix the URL or skip page_url if the page has no associated URL."
-            )
-
-        if not scan_result["safe"]:
-            return (
-                f"Billing info rejected. Security scan detected hidden prompt injection. "
-                f"Snapshot ID: {scan_result['snapshot_id']}. "
-                f"Flags: {scan_result['flags']}. "
-                f"Do not retry this."
-            )
+    scan_ok, scan_msg = await _scan_and_validate(page_url, action_label="Billing info")
+    if not scan_ok:
+        return scan_msg
 
     if injector is None:
         return (
