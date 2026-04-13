@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pop-pay"
-version = "0.8.4"
-description = "Point One Percent - Semantic Payment Guardrail for AI Agents. it only takes 0.1% of Hallucination to drain 100% of your wallet."
+version = "0.8.5"
+description = "The runtime security layer for AI agent commerce. Drop-in CLI + MCP server — blocks hallucinated purchases and keeps card credentials out of agent context. it only takes 0.1% of Hallucination to drain 100% of your wallet."
 authors = [{name="Point One Percent Team"}]
 dynamic = ["readme"]
 license = {text="MIT"}
 requires-python = ">=3.10"
-keywords = ["mcp", "mcp-server", "model-context-protocol", "ai-agent", "payment", "security", "guardrail", "virtual-card", "cdp", "browser-automation", "checkout", "prompt-injection"]
+keywords = ["cli", "command-line", "agent-tool", "payment-cli", "browser-agent", "mcp", "mcp-server", "model-context-protocol", "ai-agent", "payment", "security", "guardrail", "virtual-card", "cdp", "browser-automation", "checkout", "prompt-injection"]
 dependencies = [
     "cryptography>=46.0.5",
     "pydantic",

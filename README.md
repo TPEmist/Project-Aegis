@@ -9,18 +9,103 @@
 # Point One Percent — pop-pay
 <p align="left"><i>it only takes <b>0.1%</b> of Hallucination to drain <b>100%</b> of your wallet.</i></p>
 
-The runtime security layer for AI agent commerce. Card credentials are injected directly into the browser DOM via CDP — they never enter the agent's context window. One hallucinated prompt can't drain a wallet it can't see.
+The runtime security layer for AI agent commerce. Drop-in CLI + MCP server. Card credentials are injected directly into the browser DOM via CDP — they never enter the agent's context window. One hallucinated prompt can't drain a wallet it can't see.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/100xPercent/pop-pay-python/main/assets/runtime_demo.gif" alt="Point One Percent — live CDP injection demo" width="800">
 </p>
 
-## Getting Started
+## Install
 
-Install the core package with MCP support:
+### pipx (recommended — isolated global CLI)
+```bash
+pipx install "pop-pay[mcp]"
+```
 
+### pip
 ```bash
 pip install "pop-pay[mcp]"
+```
+
+Both expose the CLI binaries: `pop-launch`, `pop-init-vault`, `pop-unlock`, and `pop-pay` (dashboard launcher).
+
+<details>
+<summary>Other installation variants</summary>
+
+```bash
+# Core only (keyword guardrail + mock provider)
+pip install "pop-pay"
+
+# With CDP injection (browser automation)
+pip install "pop-pay[mcp,browser]"
+
+# With LLM-based guardrails (OpenAI, Ollama, vLLM, OpenRouter)
+pip install "pop-pay[mcp,llm]"
+
+# With Stripe virtual card issuing
+pip install "pop-pay[stripe]"
+
+# With LangChain integration
+pip install "pop-pay[langchain]"
+
+# Full installation (all features)
+pip install "pop-pay[all]"
+```
+
+</details>
+
+## Quick Start (CLI)
+
+### 1. Initialize the encrypted credential vault
+```bash
+pop-init-vault
+```
+
+This encrypts your card credentials into `~/.config/pop-pay/vault.enc` (AES-256-GCM). For stronger protection (blocks agents with shell access):
+
+```bash
+pop-init-vault --passphrase   # one-time setup
+pop-unlock                     # run once per session
+```
+
+### 2. Launch Chrome with CDP remote debugging
+```bash
+pop-launch
+```
+
+Opens a Chromium instance on `http://localhost:9222` that pop-pay injects credentials into. Your agent (via MCP, browser automation, or x402) then drives the checkout flow — card details never leave the browser process.
+
+### 3. Open the monitoring dashboard (optional)
+```bash
+pop-pay
+```
+
+Real-time view of agent payment activity, budget utilization, and rejection logs.
+
+### 4. Plug into your agent
+Two supported integration paths:
+
+- **MCP server** — add pop-pay to any MCP-compatible client (Claude Code, OpenClaw). See [MCP Server](#mcp-server-optional) below.
+- **Python SDK / LangChain** — see [Python SDK](#python-sdk) below.
+
+## MCP Server (optional)
+
+The MCP server is invoked as a Python module and decrypts the vault at startup.
+
+### Add to your MCP client
+
+```json
+{
+  "mcpServers": {
+    "pop-pay": {
+      "command": "python3",
+      "args": ["-m", "pop_pay.mcp_server"],
+      "env": {
+        "POP_CDP_URL": "http://localhost:9222"
+      }
+    }
+  }
+}
 ```
 
 <details>
@@ -61,48 +146,6 @@ docker-compose up -d
 Runs the MCP server + headless Chromium with CDP. Mount your encrypted vault from the host. See `docker-compose.yml` for configuration.
 
 </details>
-
-<details>
-<summary>Other installation variants</summary>
-
-```bash
-# Core only (keyword guardrail + mock provider)
-pip install "pop-pay"
-
-# With CDP injection (browser automation)
-pip install "pop-pay[mcp,browser]"
-
-# With LLM-based guardrails (OpenAI, Ollama, vLLM, OpenRouter)
-pip install "pop-pay[mcp,llm]"
-
-# With Stripe virtual card issuing
-pip install "pop-pay[stripe]"
-
-# With LangChain integration
-pip install "pop-pay[langchain]"
-
-# Full installation (all features)
-pip install "pop-pay[all]"
-```
-
-</details>
-
-## Vault Setup
-
-Credentials are stored in an AES-256-GCM encrypted vault — plaintext card data never touches disk.
-
-```bash
-pop-init-vault
-```
-
-**Passphrase mode** (recommended — protects against agents with shell access):
-
-```bash
-pop-init-vault --passphrase   # one-time setup
-pop-unlock                     # run once before each MCP session
-```
-
-`pop-unlock` derives the key from your passphrase and stores it in the OS keyring. The MCP server reads it automatically at startup.
 
 ## MCP Tools
 
@@ -146,15 +189,6 @@ Core variables in `~/.config/pop-pay/.env`. See [ENV_REFERENCE.md](./docs/ENV_RE
 | **Mock** | Test mode with generated card numbers for development. |
 
 **Priority:** Stripe Issuing → BYOC Local → Mock.
-
-## Dashboard
-
-The Vault Dashboard provides real-time monitoring of all agent payment activity, budget utilization, and rejection logs.
-
-```bash
-uv run streamlit run dashboard/app.py
-# Opens at http://localhost:8501
-```
 
 ## Python SDK
 
