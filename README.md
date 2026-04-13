@@ -22,37 +22,32 @@ The runtime security layer for AI agent commerce. Drop-in CLI + MCP server. Card
 pipx install "pop-pay[mcp]"
 ```
 
-### pip
+<details>
+<summary>Other install methods (pip / uv)</summary>
+
+**pip**:
 ```bash
 pip install "pop-pay[mcp]"
 ```
 
-Both expose the CLI binaries: `pop-launch`, `pop-init-vault`, `pop-unlock`, and `pop-pay` (dashboard launcher).
-
-<details>
-<summary>Other installation variants</summary>
-
+**uv** (isolated tool install):
 ```bash
-# Core only (keyword guardrail + mock provider)
-pip install "pop-pay"
+uv tool install "pop-pay[mcp]"
+```
 
-# With CDP injection (browser automation)
-pip install "pop-pay[mcp,browser]"
-
-# With LLM-based guardrails (OpenAI, Ollama, vLLM, OpenRouter)
-pip install "pop-pay[mcp,llm]"
-
-# With Stripe virtual card issuing
-pip install "pop-pay[stripe]"
-
-# With LangChain integration
-pip install "pop-pay[langchain]"
-
-# Full installation (all features)
-pip install "pop-pay[all]"
+**Extras matrix** — pick the feature flags you need:
+```bash
+pip install "pop-pay"                  # core (keyword guardrail + mock provider)
+pip install "pop-pay[mcp,browser]"     # CDP injection (browser automation)
+pip install "pop-pay[mcp,llm]"         # LLM guardrails (OpenAI, Ollama, vLLM, OpenRouter)
+pip install "pop-pay[stripe]"          # Stripe virtual card issuing
+pip install "pop-pay[langchain]"       # LangChain integration
+pip install "pop-pay[all]"             # everything
 ```
 
 </details>
+
+All install paths expose the CLI binaries: `pop-launch`, `pop-init-vault`, `pop-unlock`, and `pop-pay` (dashboard launcher).
 
 ## Quick Start (CLI)
 
