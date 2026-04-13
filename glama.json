@@ -2,7 +2,7 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["TPEmist"],
   "name": "Point One Percent — AI Agent Payment Guardrail",
-  "description": "Local MCP server and semantic payment guardrail for agentic workflows. Intercepts agent payment intent, evaluates reasoning against policy (keyword or LLM engine), and injects card credentials directly into browser forms via CDP — the raw card number never enters the agent's context window.",
+  "description": "The runtime security layer for AI agent commerce. Drop-in CLI + MCP server — blocks hallucinated purchases and keeps card credentials out of agent context. Intercepts agent payment intent, evaluates reasoning against policy (keyword or LLM engine), and injects card credentials directly into browser forms via CDP — the raw card number never enters the agent's context window.",
   "license": "MIT",
   "homepage": "https://github.com/100xPercent/pop-pay-python",
   "tools": [
@@ -12,5 +12,5 @@
     }
   ],
   "categories": ["finance", "security", "payments"],
-  "keywords": ["payment", "guardrail", "agentic", "mcp", "security", "cdp", "browser-automation"]
+  "keywords": ["payment", "guardrail", "agentic", "mcp", "cli", "security", "cdp", "browser-automation", "agent-tool"]
 }
