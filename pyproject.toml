@@ -41,7 +41,8 @@ all = ["pop-pay[llm,stripe,langchain,mcp,dashboard,browser,vault,passphrase]"]
 pop-launch = "pop_pay.cli:main"
 pop-init-vault = "pop_pay.cli_vault:cmd_init_vault"
 pop-unlock = "pop_pay.cli_unlock:cmd_unlock"
-pop-pay = "dashboard.server:main"
+pop-pay = "pop_pay.cli_main:main"
+pop-pay-doctor = "pop_pay.cli_doctor:main"
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md"}

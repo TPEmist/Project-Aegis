@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-04-14
+
+### Added
+- **`pop-pay doctor` diagnostic subcommand** — Python parity with the TS `pop-pay doctor`. 10 generic checks: `python_version` (≥3.10), `chromium`, `cdp_port`, `config_dir`, `vault`, `env_vars`, `policy_config`, `layer1_probe`, `layer2_probe`, `injector_smoke`. Exit codes match TS: `0` clean / `1` blocker failed / `2` crash. Supports `--json`.
+- **New dispatcher** `pop_pay.cli_main` — `pop-pay` now routes `doctor` to the new handler and falls through to the dashboard for no-arg invocation (legacy UX preserved).
+- **New entry point** `pop-pay-doctor` (pyproject `[project.scripts]`) for direct invocation.
+- **Remediation catalog** at `config/doctor-remediation.yaml` — same flat schema as the npm repo; parsed by an inline YAML-lite reader (no new runtime dependency).
+- **`docs/DOCTOR.md`** — with KNOWN LIMITATIONS documenting the intentional engine-classify gap (local handler now; typed engine classifier swap deferred to post-refactor round 2 of the paused Error Model Refactor track).
+
+### Security
+- **`check_env_vars` is format-only and content-blind.** `POP_LLM_*` secrets reported as `present (hidden)` / `missing`; no length, prefix, or hash ever emitted.
+- **`check_layer2_probe` is TCP-only.** Connects and disconnects — no HTTP request, no API key transmitted, no quota consumed.
+
 ## [0.8.6] - 2026-04-13
 
 ### Changed
