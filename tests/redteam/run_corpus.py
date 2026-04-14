@@ -12,6 +12,26 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path as _Path
+
+
+def _load_dotenv_if_present():
+    """Load ~/.config/pop-pay/.env into os.environ for unset keys."""
+    path = _Path.home() / ".config" / "pop-pay" / ".env"
+    if not path.exists():
+        return
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+            val = val[1:-1]
+        if not os.environ.get(key):
+            os.environ[key] = val
+
 
 _KEY_PATTERNS = [
     (re.compile(r"sk-[A-Za-z0-9_-]{16,}"), "sk-REDACTED"),
@@ -141,6 +161,7 @@ def main() -> int:
     if os.environ.get("POP_REDTEAM") != "1":
         print("POP_REDTEAM=1 required. Refusing to run.", file=sys.stderr)
         return 2
+    _load_dotenv_if_present()
     p = argparse.ArgumentParser()
     p.add_argument("--filter", default=None, help="Restrict to a single category letter")
     p.add_argument("--n", type=int, default=5)
