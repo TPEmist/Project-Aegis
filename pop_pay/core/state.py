@@ -61,6 +61,10 @@ class PopStateTracker:
 
     def _init_db(self):
         cursor = self.conn.cursor()
+        # RT-2 R2 N1: secure_delete overwrites freed pages during DELETE
+        # and VACUUM, so legacy card_number residue in the freelist is
+        # zeroed rather than left as readable plaintext.
+        cursor.execute("PRAGMA secure_delete = ON")
         # Create daily_budget table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS daily_budget (
@@ -163,6 +167,18 @@ class PopStateTracker:
         if "rejection_reason" not in audit_columns:
             cursor.execute("ALTER TABLE audit_log ADD COLUMN rejection_reason TEXT")
         self.conn.commit()
+
+        # RT-2 R2 N1: one-time VACUUM to rewrite all pages, including the
+        # freelist pages that still hold plaintext card_number data after
+        # the legacy DROP TABLE + RENAME. secure_delete (set in _init_db)
+        # determines the fill pattern for freed pages. Idempotent via
+        # user_version — re-opening an already-migrated DB skips the VACUUM.
+        cursor.execute("PRAGMA user_version")
+        user_version = cursor.fetchone()[0]
+        if user_version < 2:
+            cursor.execute("VACUUM")
+            cursor.execute("PRAGMA user_version = 2")
+            self.conn.commit()
 
     def _utc_now_iso(self) -> str:
         """Return the current UTC time as an ISO 8601 string with a Z suffix."""
