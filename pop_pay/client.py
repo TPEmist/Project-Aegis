@@ -3,6 +3,7 @@ from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
 from pop_pay.providers.base import VirtualCardProvider
 from pop_pay.engine.guardrails import GuardrailEngine
 from pop_pay.core.state import PopStateTracker
+from pop_pay.errors import PopPayLLMError
 
 class PopClient:
     def __init__(self, provider: VirtualCardProvider, policy: GuardrailPolicy, engine: GuardrailEngine = None, db_path: str = None):
@@ -31,8 +32,26 @@ class PopClient:
             )
             return seal
 
-        # Evaluate intent
-        approved, reason = await self.engine.evaluate_intent(intent, self.policy)
+        # Evaluate intent. Typed PopPayLLMError (RetryExhausted / ProviderUnreachable /
+        # InvalidResponse) must be surfaced as evaluation-failure, not a guardrail block —
+        # otherwise quota burn or transport faults masquerade as policy rejections.
+        try:
+            approved, reason = await self.engine.evaluate_intent(intent, self.policy)
+        except PopPayLLMError as e:
+            seal = VirtualSeal(
+                seal_id=str(uuid.uuid4()),
+                authorized_amount=0.0,
+                status="Rejected",
+                rejection_reason=f"evaluation_failed:{e.code}:{e}",
+            )
+            self.state_tracker.record_seal(
+                seal.seal_id,
+                seal.authorized_amount,
+                intent.target_vendor,
+                status=seal.status,
+                rejection_reason=seal.rejection_reason,
+            )
+            return seal
         if not approved:
             seal = VirtualSeal(
                 seal_id=str(uuid.uuid4()),

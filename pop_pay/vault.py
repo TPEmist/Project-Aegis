@@ -20,6 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from pop_pay.errors import VaultDecryptFailed, VaultNotFound, VaultLocked
+
 # AES-256-GCM via cryptography library (pip install cryptography)
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -66,7 +68,7 @@ def _get_machine_id() -> bytes:
                 if "IOPlatformUUID" in line:
                     uid = line.split('"')[-2]
                     return uid.encode()
-        except Exception:
+        except (OSError, subprocess.SubprocessError, IndexError):
             pass
 
     # Windows: MachineGuid from registry
@@ -78,7 +80,7 @@ def _get_machine_id() -> bytes:
             guid, _ = winreg.QueryValueEx(key, "MachineGuid")
             winreg.CloseKey(key)
             return guid.encode()
-        except Exception:
+        except (OSError, ImportError):
             pass
 
     # Fallback: generate a random ID and store it alongside the vault
@@ -98,7 +100,7 @@ def _get_username() -> bytes:
     import pwd
     try:
         return pwd.getpwuid(os.getuid()).pw_name.encode()
-    except Exception:
+    except (KeyError, OSError):
         pass
     return os.environ.get("USER", os.environ.get("USERNAME", "unknown")).encode()
 
@@ -116,7 +118,7 @@ def _derive_key(salt: bytes = None, key_override: bytes = None) -> bytes:
     machine_id = _get_machine_id()
     try:
         username = _get_username()
-    except Exception:
+    except (KeyError, OSError):
         username = b"unknown"
 
     # Try Cython hardened path first (salt stays inside .so, never exposed)
@@ -126,7 +128,7 @@ def _derive_key(salt: bytes = None, key_override: bytes = None) -> bytes:
             key = _vault_core.derive_key(machine_id, username)
             if key is not None:
                 return key
-        except Exception:
+        except (ImportError, AttributeError, OSError):
             pass
         salt = _OSS_SALT
 
@@ -156,11 +158,17 @@ def store_key_in_keyring(key: bytes):
     """Store derived key in OS keyring (macOS Keychain / Linux libsecret / Windows Credential Manager)."""
     try:
         import keyring
-        keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, key.hex())
     except ImportError:
         raise ImportError(
             "keyring package required for passphrase mode. "
             "Install with: pip install 'pop-pay[passphrase]'"
+        )
+    try:
+        keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, key.hex())
+    except (RuntimeError, OSError) as e:
+        raise VaultLocked(
+            "Failed to store derived key in OS keyring.",
+            cause=e,
         )
 
 
@@ -171,7 +179,7 @@ def load_key_from_keyring() -> bytes | None:
         hex_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
         if hex_key:
             return bytes.fromhex(hex_key)
-    except Exception:
+    except (ImportError, ValueError, RuntimeError):
         pass
     return None
 
@@ -181,7 +189,7 @@ def clear_keyring():
     try:
         import keyring
         keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
-    except Exception:
+    except (ImportError, RuntimeError):
         pass
 
 
@@ -203,16 +211,16 @@ def decrypt_credentials(blob: bytes, salt: bytes = None, key_override: bytes = N
     if AESGCM is None:
         raise ImportError("cryptography package required: pip install 'pop-pay[vault]'")
     if len(blob) < 28:  # 12 nonce + at least 16 GCM tag
-        raise ValueError("vault.enc is corrupted or too small")
+        raise VaultDecryptFailed("vault.enc is corrupted or too small")
     key = _derive_key(salt, key_override=key_override)
     nonce, ciphertext = blob[:12], blob[12:]
     aesgcm = AESGCM(key)
     try:
         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-    except Exception:
-        raise ValueError(
-            "Failed to decrypt vault — wrong key (machine changed?) or corrupted vault.\n"
-            "Re-run: pop-pay init-vault"
+    except Exception as e:
+        raise VaultDecryptFailed(
+            "Failed to decrypt vault — wrong key (machine changed?) or corrupted vault.",
+            cause=e,
         )
     return json.loads(plaintext)
 
@@ -240,7 +248,7 @@ def _write_vault_mode(is_passphrase: bool = False):
         try:
             from pop_pay.engine import _vault_core
             mode = "machine-hardened" if _vault_core.is_hardened() else "machine-oss"
-        except Exception:
+        except (ImportError, AttributeError):
             mode = "machine-oss"
     marker = VAULT_DIR / ".vault_mode"
     marker.write_text(mode)
@@ -271,6 +279,9 @@ def load_vault() -> dict:
     This prevents an attacker from deleting the .so to force re-initialization
     with the weaker public salt.
     """
+    if not VAULT_PATH.exists():
+        raise VaultNotFound()
+
     # Downgrade check: vault marker says hardened but .so is gone
     vault_mode = _read_vault_mode()
     if vault_mode == "machine-hardened":
@@ -311,7 +322,7 @@ def load_vault() -> dict:
     if passphrase_key is not None:
         try:
             return decrypt_credentials(blob, key_override=passphrase_key)
-        except ValueError:
+        except VaultDecryptFailed:
             pass  # Wrong key — fall through to machine-derived key
     return decrypt_credentials(blob)
 
@@ -395,7 +406,7 @@ def save_vault(creds: dict, key_override: bytes = None):
             decrypt_credentials(VAULT_PATH.read_bytes(), key_override=key_override)
         else:
             decrypt_credentials(VAULT_PATH.read_bytes())
-    except ValueError as e:
+    except VaultDecryptFailed as e:
         raise RuntimeError(f"Vault write verification failed: {e}")
     # Write mode marker — F4/F7: passphrase / machine-hardened / machine-oss
     _write_vault_mode(is_passphrase=key_override is not None)
