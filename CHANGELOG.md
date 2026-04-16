@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-04-15
+
+### Security (S0.7 Vault Hardening — F1-F8)
+- **F1 — `filtered_env()` + `SENSITIVE_ENV_KEYS`.** Strips `POP_BYOC_NUMBER` / `POP_BYOC_CVV` / `POP_BYOC_EXP_MONTH` / `POP_BYOC_EXP_YEAR` from any env dict spawned to child processes. `load_vault()` guarantees BYOC keys never leak into `os.environ`. New regression tests cover subprocess env inheritance.
+- **F3 — OSS salt consent gate.** `machine-oss` vaults now refuse to decrypt unless `POP_ACCEPT_OSS_SALT=1` is set. Passphrase-mode vaults bypass the gate. Protects against silent weak-crypto decryption when running OSS-source builds.
+- **F4 — Vault mode marker migration.** Legacy markers (`hardened` / `oss`) transparently migrate on read to `machine-hardened` / `machine-oss`; `passphrase` marker distinguishes keyring-backed vaults from machine-id vaults.
+- **F6 — Typed error lifecycle.** `ProviderUnreachable`, `InvalidResponse`, `RetryExhausted` are now raised from the LLM guardrail and no longer swallowed as `(False, ...)` block verdicts. Retry exhaustion cannot masquerade as a guardrail rejection (bug fix: engine retry-exhaust).
+- **F7 — Downgrade refuse.** `machine-hardened` marker + native `_vault_core.is_hardened()` returning `False` raises `RuntimeError` on `load_vault()`; `pop-init-vault` refuses overwrite.
+- **F8 — Stale `.tmp` sweep + `wipe_vault_artifacts()`.** `save_vault()` sweeps `vault.enc*.tmp` siblings before atomic-writing. New `pop-init-vault --wipe` enumerates and deletes `vault.enc`, `.vault_mode`, `.machine_id`, and stale `.tmp` files.
+- **Bounty policy remains private.** Three scope categories (Passive Leak / Active Attack / Vault Extraction) retained; public tier disclosure + Hall of Fame deferred until internal red team iteration completes.
+
+### Added
+- **Error Model Refactor (`pop_pay/errors.py`).** Full `PopPayError` hierarchy: `VaultDecryptFailed` / `VaultNativeUnavailable` / `ConfigMissing` / `ConfigInvalid` / `ProviderUnreachable` / `InvalidResponse` / `RetryExhausted` / `InjectorTimeout` / `InjectorCDPFailure` / `LLMAPIKeyMissing`. CLI entry points route through `handle_cli_error()` for consistent exit codes and user-facing remediation.
+- **RT-1 harness + 585-payload v1 corpus parity.** `tests/redteam/` with 5 runner paths (`layer1`, `layer2`, `full_mcp`, `toctou`, `hybrid`), corpus mirrored from the npm repo at `tests/redteam/corpus/attacks.json`, validator, aggregator, per-runner tests.
+- **LLM guardrail prompt upgrade.** Switched to few-shot XML-examples format with inline injection-resistance demos (`evil-payments.io`, `admin-override` reasoning). New `block_hallucination_loops` policy switch.
+- **`docs/CATEGORIES_DECISION_CRITERIA.md`** — S0.2a decision framework for vendor allowlist categories.
+- **`docs/GUARDRAIL_BENCHMARK.md`** — formal benchmark methodology + results registry.
+
+### Changed
+- **Capability-forward documentation.** `SECURITY.md` / `docs/THREAT_MODEL.md` rewritten per CEO REVISE — legacy 20-scenario / 95% claims and §5 Known Limitations removed from the public face; threat-model prelude relocated to `docs/internal/py-security-history.md`.
+- **`.env` template quoting.** `POP_ALLOWED_CATEGORIES` JSON arrays wrapped in single quotes; `POP_BILLING_STREET` / `POP_BILLING_CITY` values with spaces double-quoted so `dotenv` parses them cleanly.
+
 ## [0.8.7] - 2026-04-14
 
 ### Added
