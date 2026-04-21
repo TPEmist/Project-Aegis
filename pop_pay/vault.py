@@ -38,6 +38,35 @@ KEYRING_USERNAME = "derived-key-hex"
 # PyPI/Cython builds will replace this with a compiled-in secret.
 _OSS_SALT = b"pop-pay-oss-v1-public-salt-2026"
 
+# F13: vault blob format version byte.
+# Layout: MAGIC(2)=0x5050 ("PP") || VERSION(1)=0x01 || RESERVED(1)=0x00 ||
+#         nonce(12) || ciphertext || tag(16). The 4-byte header is bound into
+# AEAD AAD so tampering with it fails tag verification. Legacy v0 blobs have
+# no header; the reader detects absence of magic and falls back to the v0
+# path (decrypt without AAD). The next save_vault rewrites as v1.
+_VAULT_VERSION_V1 = 0x01
+_VAULT_HEADER_V1 = bytes([0x50, 0x50, _VAULT_VERSION_V1, 0x00])
+_VAULT_HEADER_LEN = 4
+
+# One-time legacy-read migration notice (per process). Reset for tests.
+_legacy_v0_notified = False
+
+
+def _notify_legacy_v0_once() -> None:
+    global _legacy_v0_notified
+    if _legacy_v0_notified:
+        return
+    _legacy_v0_notified = True
+    sys.stderr.write(
+        "pop-pay: migrating vault to format v1; saved once you next update credentials.\n"
+    )
+
+
+def _reset_legacy_migration_notified() -> None:
+    """Exported for tests only."""
+    global _legacy_v0_notified
+    _legacy_v0_notified = False
+
 OSS_WARNING = (
     "\n⚠️  pop-pay SECURITY NOTICE: Running from source build (OSS mode).\n"
     "   Vault encryption uses a public salt. An agent with shell execution\n"
@@ -198,7 +227,12 @@ def clear_keyring():
 
 
 def encrypt_credentials(creds: dict, salt: bytes = None, key_override: bytes = None) -> bytes:
-    """Encrypt credentials dict to bytes (nonce + ciphertext + GCM tag)."""
+    """Encrypt credentials dict to F13 v1 vault blob.
+
+    Layout: MAGIC(2)=0x5050 || VERSION(1)=0x01 || RESERVED(1)=0x00 ||
+            nonce(12) || ciphertext || GCM-tag(16). The 4-byte header is
+    bound into AEAD AAD so tampering fails tag verification.
+    """
     if AESGCM is None:
         raise ImportError("cryptography package required: pip install 'pop-pay[vault]'")
     import os as _os
@@ -206,27 +240,58 @@ def encrypt_credentials(creds: dict, salt: bytes = None, key_override: bytes = N
     nonce = _os.urandom(12)  # 96-bit random nonce
     aesgcm = AESGCM(key)
     plaintext = json.dumps(creds).encode()
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-    return nonce + ciphertext  # nonce prepended; GCM tag is appended by library
+    ciphertext = aesgcm.encrypt(nonce, plaintext, _VAULT_HEADER_V1)  # F13 AAD
+    return _VAULT_HEADER_V1 + nonce + ciphertext
 
 
-def decrypt_credentials(blob: bytes, salt: bytes = None, key_override: bytes = None) -> dict:
-    """Decrypt vault blob to credentials dict. Raises ValueError on wrong key/corruption."""
-    if AESGCM is None:
-        raise ImportError("cryptography package required: pip install 'pop-pay[vault]'")
-    if len(blob) < 28:  # 12 nonce + at least 16 GCM tag
-        raise VaultDecryptFailed("vault.enc is corrupted or too small")
+def _decrypt_body(
+    body: bytes,
+    salt: bytes | None,
+    key_override: bytes | None,
+    aad: bytes | None,
+) -> dict:
     key = _derive_key(salt, key_override=key_override)
-    nonce, ciphertext = blob[:12], blob[12:]
+    nonce, ciphertext = body[:12], body[12:]
     aesgcm = AESGCM(key)
     try:
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, aad)
     except Exception as e:
         raise VaultDecryptFailed(
             "Failed to decrypt vault — wrong key (machine changed?) or corrupted vault.",
             cause=e,
         )
     return json.loads(plaintext)
+
+
+def decrypt_credentials(blob: bytes, salt: bytes = None, key_override: bytes = None) -> dict:
+    """Decrypt vault blob to credentials dict.
+
+    F13 dispatch: if the blob starts with MAGIC(0x5050), read VERSION +
+    RESERVED, bind the 4-byte header as AEAD AAD, decrypt the remaining
+    body. Legacy v0 blobs (no magic) fall back to the header-less path and
+    emit a one-time migration notice.
+    """
+    if AESGCM is None:
+        raise ImportError("cryptography package required: pip install 'pop-pay[vault]'")
+
+    has_magic = len(blob) >= 2 and blob[0] == 0x50 and blob[1] == 0x50
+    if has_magic:
+        if len(blob) < _VAULT_HEADER_LEN + 28:  # 4 header + 12 nonce + 16 tag
+            raise VaultDecryptFailed("vault.enc is corrupted or too small")
+        version = blob[2]
+        if version != _VAULT_VERSION_V1:
+            raise VaultDecryptFailed(
+                f"vault format v{version} not supported — upgrade pop-pay"
+            )
+        header = blob[:_VAULT_HEADER_LEN]
+        body = blob[_VAULT_HEADER_LEN:]
+        return _decrypt_body(body, salt, key_override, header)
+
+    # Legacy v0 path — no magic, no AAD. Next save_vault rewrites as v1.
+    if len(blob) < 28:
+        raise VaultDecryptFailed("vault.enc is corrupted or too small")
+    _notify_legacy_v0_once()
+    return _decrypt_body(blob, salt, key_override, None)
 
 
 def vault_exists() -> bool:
