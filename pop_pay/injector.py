@@ -387,8 +387,23 @@ class PopBrowserInjector:
         Returns None if the domain is OK, or a blocked_reason string
         (e.g. "domain_mismatch:<domain>") if the check fails.
         """
-        if not page_url or not approved_vendor:
+        if not approved_vendor:
+            # No vendor context to verify against -- nothing to enforce.
             return None
+        if not page_url:
+            # R1/F1 fix: an empty page_url used to silently skip the domain
+            # guard entirely. A compromised agent could omit page_url to bypass
+            # verification while injection still proceeded against whatever
+            # page _find_best_page happened to resolve. Whenever a vendor is
+            # being enforced, refuse to inject without a page_url to check --
+            # there is nothing to validate the injection target against.
+            logger.warning(
+                "PopBrowserInjector: TOCTOU guard invoked with empty page_url "
+                "for approved vendor '%s' -- refusing to skip domain "
+                "verification.",
+                approved_vendor,
+            )
+            return "empty_page_url"
 
         from urllib.parse import urlparse
         import re
@@ -596,6 +611,25 @@ class PopBrowserInjector:
                         return result
 
                     await page.bring_to_front()
+
+                # R1/F1 fix: validate-here / inject-there. The page actually
+                # resolved above (via _find_best_page, the auto-bridge, or the
+                # headless navigation) may differ from what was checked at the
+                # top of this function -- e.g. an attacker-controlled tab
+                # already open in a shared CDP browser. Re-verify the domain of
+                # the ACTUAL resolved page immediately before injecting; abort
+                # with no fields filled on any mismatch. Never inject into a
+                # page whose domain was not the approved one.
+                resolved_blocked = self._verify_domain_toctou(page.url, approved_vendor)
+                if resolved_blocked:
+                    result["blocked_reason"] = resolved_blocked
+                    logger.warning(
+                        "PopBrowserInjector: resolved injection target does "
+                        "not match approved vendor '%s' -- aborting before "
+                        "injection.",
+                        approved_vendor,
+                    )
+                    return result
 
                 # POP_BLACKOUT_MODE: "before" | "after" | "off"
                 #   before = mask fields before injection (more secure, agent never sees card)
@@ -1150,6 +1184,20 @@ class PopBrowserInjector:
                         return result
 
                 await page.bring_to_front()
+
+                # R1/F1 fix: re-verify the domain of the ACTUAL resolved page
+                # immediately before injecting billing fields -- see the
+                # matching guard in inject_payment_info for rationale.
+                resolved_blocked = self._verify_domain_toctou(page.url, approved_vendor)
+                if resolved_blocked:
+                    result["blocked_reason"] = resolved_blocked
+                    logger.warning(
+                        "PopBrowserInjector: resolved billing injection target "
+                        "does not match approved vendor '%s' -- aborting "
+                        "before injection.",
+                        approved_vendor,
+                    )
+                    return result
 
                 billing_result = await self._fill_billing_fields(page, billing_info)
                 result["billing_filled"] = bool(billing_result["filled"])

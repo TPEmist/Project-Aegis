@@ -18,14 +18,24 @@ try:
 except (ImportError, ValueError, OSError):
     pass  # Windows or restricted env — best effort
 
-# Load .env from the dedicated config dir first (preferred, keeps credentials out of the
-# project working directory and away from agent file-read tools).
-# Falls back to the standard dotenv cwd-search if no config file exists yet.
-_config_env = Path.home() / ".config" / "pop-pay" / ".env"
-if _config_env.exists():
-    load_dotenv(_config_env)
+# R2/F-SC1 fix: load config ONLY from an explicit, trusted location -- never
+# from the current working directory. An attacker-planted .env in an
+# untrusted repo/CWD could previously override POP_MAX_DAILY,
+# POP_REQUIRE_HUMAN_APPROVAL, or redirect POP_LLM_BASE_URL to an
+# attacker-controlled endpoint (auto-approve + credential exfiltration).
+#
+# Resolution order (first match wins; a CWD .env is never consulted):
+#   1. POP_CONFIG env var, if set -- explicit override path.
+#   2. ~/.config/pop-pay/.env, if it exists -- the default config location.
+#   3. Neither exists -- proceed with whatever is already in the real
+#      process environment (no dotenv file loaded, no cwd search).
+_explicit_config_env = os.getenv("POP_CONFIG")
+if _explicit_config_env:
+    load_dotenv(Path(_explicit_config_env))
 else:
-    load_dotenv()
+    _config_env = Path.home() / ".config" / "pop-pay" / ".env"
+    if _config_env.exists():
+        load_dotenv(_config_env)
 
 # ---------------------------------------------------------------------------
 # Vault: load encrypted credentials if vault.enc exists

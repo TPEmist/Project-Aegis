@@ -8,9 +8,12 @@ from unittest.mock import MagicMock
 class TestVerifyDomainToctou:
     """Unit tests for the shared _verify_domain_toctou static method."""
 
-    def test_empty_page_url_returns_none(self):
+    def test_empty_page_url_blocks_when_vendor_set(self):
+        """R1/F1 fix: an empty page_url used to `return None` (not blocked) --
+        the validate-here/inject-there bypass. Whenever a vendor is being
+        enforced, an empty page_url must now be treated as blocked."""
         from pop_pay.injector import PopBrowserInjector
-        assert PopBrowserInjector._verify_domain_toctou("", "wikipedia") is None
+        assert PopBrowserInjector._verify_domain_toctou("", "wikipedia") == "empty_page_url"
 
     def test_empty_vendor_returns_none(self):
         from pop_pay.injector import PopBrowserInjector
