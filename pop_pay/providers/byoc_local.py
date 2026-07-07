@@ -1,5 +1,6 @@
 import os
 import uuid
+from pathlib import Path
 from dotenv import load_dotenv
 from pop_pay.providers.base import VirtualCardProvider
 from pop_pay.core.models import PaymentIntent, GuardrailPolicy, VirtualSeal
@@ -7,7 +8,20 @@ from pop_pay.core.secret_str import SecretStr
 
 class LocalVaultProvider(VirtualCardProvider):
     def __init__(self, creds: dict | None = None):
-        load_dotenv()
+        # R2/F-SC1 fix: never fall back to a CWD .env search here -- same
+        # untrusted-CWD risk as mcp_server.py's config loading (an attacker-
+        # planted .env in the working directory could otherwise override
+        # POP_BYOC_NUMBER/CVV, substituting a different card for payment).
+        # Only load from POP_CONFIG (if set) or the default config dir; if
+        # neither exists, rely on whatever mcp_server.py already loaded into
+        # the real process environment.
+        _explicit_config_env = os.getenv("POP_CONFIG")
+        if _explicit_config_env:
+            load_dotenv(Path(_explicit_config_env))
+        else:
+            _config_env = Path.home() / ".config" / "pop-pay" / ".env"
+            if _config_env.exists():
+                load_dotenv(_config_env)
         # S0.7 F1: prefer explicitly injected creds (vault path). Env fallback
         # is for users setting POP_BYOC_* manually in .env without a vault.
         # Plaintext PAN/CVV no longer round-trips through os.environ when
